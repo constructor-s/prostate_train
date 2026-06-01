@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific: Data and datasets
+# Downloaded datasets are stored locally but not tracked in version control.
+# They are reproducible via the download script.
+data/
+uv.lock

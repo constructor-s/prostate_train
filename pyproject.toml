@@ -1,0 +1,12 @@
+[project]
+name = "prostate-train"
+version = "0.1.0"
+description = "A standalone script for downloading the Prostate158 dataset."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "zenodo-get>=3.0.3",
+]
+
+[tool.uv]
+package = false

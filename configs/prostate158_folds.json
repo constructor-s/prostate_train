@@ -2,699 +2,699 @@
     "training": [
         {
             "image": "train/024/t2.nii.gz",
-            "label": "train/024/empty.nii.gz",
+            "label": "train/024/t2_anatomy_reader1.nii.gz",
             "id": "24"
         },
         {
             "image": "train/025/t2.nii.gz",
-            "label": "train/025/adc_tumor_reader1.nii.gz",
+            "label": "train/025/t2_anatomy_reader1.nii.gz",
             "id": "25"
         },
         {
             "image": "train/026/t2.nii.gz",
-            "label": "train/026/empty.nii.gz",
+            "label": "train/026/t2_anatomy_reader1.nii.gz",
             "id": "26"
         },
         {
             "image": "train/027/t2.nii.gz",
-            "label": "train/027/adc_tumor_reader1.nii.gz",
+            "label": "train/027/t2_anatomy_reader1.nii.gz",
             "id": "27"
         },
         {
             "image": "train/028/t2.nii.gz",
-            "label": "train/028/empty.nii.gz",
+            "label": "train/028/t2_anatomy_reader1.nii.gz",
             "id": "28"
         },
         {
             "image": "train/029/t2.nii.gz",
-            "label": "train/029/adc_tumor_reader1.nii.gz",
+            "label": "train/029/t2_anatomy_reader1.nii.gz",
             "id": "29"
         },
         {
             "image": "train/030/t2.nii.gz",
-            "label": "train/030/adc_tumor_reader1.nii.gz",
+            "label": "train/030/t2_anatomy_reader1.nii.gz",
             "id": "30"
         },
         {
             "image": "train/031/t2.nii.gz",
-            "label": "train/031/adc_tumor_reader1.nii.gz",
+            "label": "train/031/t2_anatomy_reader1.nii.gz",
             "id": "31"
         },
         {
             "image": "train/032/t2.nii.gz",
-            "label": "train/032/adc_tumor_reader1.nii.gz",
+            "label": "train/032/t2_anatomy_reader1.nii.gz",
             "id": "32"
         },
         {
             "image": "train/033/t2.nii.gz",
-            "label": "train/033/adc_tumor_reader1.nii.gz",
+            "label": "train/033/t2_anatomy_reader1.nii.gz",
             "id": "33"
         },
         {
             "image": "train/034/t2.nii.gz",
-            "label": "train/034/empty.nii.gz",
+            "label": "train/034/t2_anatomy_reader1.nii.gz",
             "id": "34"
         },
         {
             "image": "train/035/t2.nii.gz",
-            "label": "train/035/adc_tumor_reader1.nii.gz",
+            "label": "train/035/t2_anatomy_reader1.nii.gz",
             "id": "35"
         },
         {
             "image": "train/036/t2.nii.gz",
-            "label": "train/036/adc_tumor_reader1.nii.gz",
+            "label": "train/036/t2_anatomy_reader1.nii.gz",
             "id": "36"
         },
         {
             "image": "train/037/t2.nii.gz",
-            "label": "train/037/empty.nii.gz",
+            "label": "train/037/t2_anatomy_reader1.nii.gz",
             "id": "37"
         },
         {
             "image": "train/039/t2.nii.gz",
-            "label": "train/039/adc_tumor_reader1.nii.gz",
+            "label": "train/039/t2_anatomy_reader1.nii.gz",
             "id": "39"
         },
         {
             "image": "train/040/t2.nii.gz",
-            "label": "train/040/empty.nii.gz",
+            "label": "train/040/t2_anatomy_reader1.nii.gz",
             "id": "40"
         },
         {
             "image": "train/042/t2.nii.gz",
-            "label": "train/042/empty.nii.gz",
+            "label": "train/042/t2_anatomy_reader1.nii.gz",
             "id": "42"
         },
         {
             "image": "train/043/t2.nii.gz",
-            "label": "train/043/adc_tumor_reader1.nii.gz",
+            "label": "train/043/t2_anatomy_reader1.nii.gz",
             "id": "43"
         },
         {
             "image": "train/044/t2.nii.gz",
-            "label": "train/044/empty.nii.gz",
+            "label": "train/044/t2_anatomy_reader1.nii.gz",
             "id": "44"
         },
         {
             "image": "train/045/t2.nii.gz",
-            "label": "train/045/adc_tumor_reader1.nii.gz",
+            "label": "train/045/t2_anatomy_reader1.nii.gz",
             "id": "45"
         },
         {
             "image": "train/048/t2.nii.gz",
-            "label": "train/048/adc_tumor_reader1.nii.gz",
+            "label": "train/048/t2_anatomy_reader1.nii.gz",
             "id": "48"
         },
         {
             "image": "train/049/t2.nii.gz",
-            "label": "train/049/empty.nii.gz",
+            "label": "train/049/t2_anatomy_reader1.nii.gz",
             "id": "49"
         },
         {
             "image": "train/050/t2.nii.gz",
-            "label": "train/050/adc_tumor_reader1.nii.gz",
+            "label": "train/050/t2_anatomy_reader1.nii.gz",
             "id": "50"
         },
         {
             "image": "train/052/t2.nii.gz",
-            "label": "train/052/adc_tumor_reader1.nii.gz",
+            "label": "train/052/t2_anatomy_reader1.nii.gz",
             "id": "52"
         },
         {
             "image": "train/053/t2.nii.gz",
-            "label": "train/053/adc_tumor_reader1.nii.gz",
+            "label": "train/053/t2_anatomy_reader1.nii.gz",
             "id": "53"
         },
         {
             "image": "train/054/t2.nii.gz",
-            "label": "train/054/empty.nii.gz",
+            "label": "train/054/t2_anatomy_reader1.nii.gz",
             "id": "54"
         },
         {
             "image": "train/055/t2.nii.gz",
-            "label": "train/055/empty.nii.gz",
+            "label": "train/055/t2_anatomy_reader1.nii.gz",
             "id": "55"
         },
         {
             "image": "train/057/t2.nii.gz",
-            "label": "train/057/adc_tumor_reader1.nii.gz",
+            "label": "train/057/t2_anatomy_reader1.nii.gz",
             "id": "57"
         },
         {
             "image": "train/058/t2.nii.gz",
-            "label": "train/058/adc_tumor_reader1.nii.gz",
+            "label": "train/058/t2_anatomy_reader1.nii.gz",
             "id": "58"
         },
         {
             "image": "train/059/t2.nii.gz",
-            "label": "train/059/adc_tumor_reader1.nii.gz",
+            "label": "train/059/t2_anatomy_reader1.nii.gz",
             "id": "59"
         },
         {
             "image": "train/062/t2.nii.gz",
-            "label": "train/062/empty.nii.gz",
+            "label": "train/062/t2_anatomy_reader1.nii.gz",
             "id": "62"
         },
         {
             "image": "train/063/t2.nii.gz",
-            "label": "train/063/adc_tumor_reader1.nii.gz",
+            "label": "train/063/t2_anatomy_reader1.nii.gz",
             "id": "63"
         },
         {
             "image": "train/064/t2.nii.gz",
-            "label": "train/064/adc_tumor_reader1.nii.gz",
+            "label": "train/064/t2_anatomy_reader1.nii.gz",
             "id": "64"
         },
         {
             "image": "train/065/t2.nii.gz",
-            "label": "train/065/adc_tumor_reader1.nii.gz",
+            "label": "train/065/t2_anatomy_reader1.nii.gz",
             "id": "65"
         },
         {
             "image": "train/066/t2.nii.gz",
-            "label": "train/066/adc_tumor_reader1.nii.gz",
+            "label": "train/066/t2_anatomy_reader1.nii.gz",
             "id": "66"
         },
         {
             "image": "train/067/t2.nii.gz",
-            "label": "train/067/empty.nii.gz",
+            "label": "train/067/t2_anatomy_reader1.nii.gz",
             "id": "67"
         },
         {
             "image": "train/068/t2.nii.gz",
-            "label": "train/068/empty.nii.gz",
+            "label": "train/068/t2_anatomy_reader1.nii.gz",
             "id": "68"
         },
         {
             "image": "train/069/t2.nii.gz",
-            "label": "train/069/empty.nii.gz",
+            "label": "train/069/t2_anatomy_reader1.nii.gz",
             "id": "69"
         },
         {
             "image": "train/070/t2.nii.gz",
-            "label": "train/070/empty.nii.gz",
+            "label": "train/070/t2_anatomy_reader1.nii.gz",
             "id": "70"
         },
         {
             "image": "train/071/t2.nii.gz",
-            "label": "train/071/empty.nii.gz",
+            "label": "train/071/t2_anatomy_reader1.nii.gz",
             "id": "71"
         },
         {
             "image": "train/072/t2.nii.gz",
-            "label": "train/072/empty.nii.gz",
+            "label": "train/072/t2_anatomy_reader1.nii.gz",
             "id": "72"
         },
         {
             "image": "train/073/t2.nii.gz",
-            "label": "train/073/adc_tumor_reader1.nii.gz",
+            "label": "train/073/t2_anatomy_reader1.nii.gz",
             "id": "73"
         },
         {
             "image": "train/074/t2.nii.gz",
-            "label": "train/074/adc_tumor_reader1.nii.gz",
+            "label": "train/074/t2_anatomy_reader1.nii.gz",
             "id": "74"
         },
         {
             "image": "train/075/t2.nii.gz",
-            "label": "train/075/adc_tumor_reader1.nii.gz",
+            "label": "train/075/t2_anatomy_reader1.nii.gz",
             "id": "75"
         },
         {
             "image": "train/076/t2.nii.gz",
-            "label": "train/076/adc_tumor_reader1.nii.gz",
+            "label": "train/076/t2_anatomy_reader1.nii.gz",
             "id": "76"
         },
         {
             "image": "train/078/t2.nii.gz",
-            "label": "train/078/adc_tumor_reader1.nii.gz",
+            "label": "train/078/t2_anatomy_reader1.nii.gz",
             "id": "78"
         },
         {
             "image": "train/079/t2.nii.gz",
-            "label": "train/079/adc_tumor_reader1.nii.gz",
+            "label": "train/079/t2_anatomy_reader1.nii.gz",
             "id": "79"
         },
         {
             "image": "train/080/t2.nii.gz",
-            "label": "train/080/adc_tumor_reader1.nii.gz",
+            "label": "train/080/t2_anatomy_reader1.nii.gz",
             "id": "80"
         },
         {
             "image": "train/081/t2.nii.gz",
-            "label": "train/081/adc_tumor_reader1.nii.gz",
+            "label": "train/081/t2_anatomy_reader1.nii.gz",
             "id": "81"
         },
         {
             "image": "train/082/t2.nii.gz",
-            "label": "train/082/adc_tumor_reader1.nii.gz",
+            "label": "train/082/t2_anatomy_reader1.nii.gz",
             "id": "82"
         },
         {
             "image": "train/083/t2.nii.gz",
-            "label": "train/083/empty.nii.gz",
+            "label": "train/083/t2_anatomy_reader1.nii.gz",
             "id": "83"
         },
         {
             "image": "train/085/t2.nii.gz",
-            "label": "train/085/empty.nii.gz",
+            "label": "train/085/t2_anatomy_reader1.nii.gz",
             "id": "85"
         },
         {
             "image": "train/086/t2.nii.gz",
-            "label": "train/086/adc_tumor_reader1.nii.gz",
+            "label": "train/086/t2_anatomy_reader1.nii.gz",
             "id": "86"
         },
         {
             "image": "train/088/t2.nii.gz",
-            "label": "train/088/adc_tumor_reader1.nii.gz",
+            "label": "train/088/t2_anatomy_reader1.nii.gz",
             "id": "88"
         },
         {
             "image": "train/089/t2.nii.gz",
-            "label": "train/089/adc_tumor_reader1.nii.gz",
+            "label": "train/089/t2_anatomy_reader1.nii.gz",
             "id": "89"
         },
         {
             "image": "train/090/t2.nii.gz",
-            "label": "train/090/adc_tumor_reader1.nii.gz",
+            "label": "train/090/t2_anatomy_reader1.nii.gz",
             "id": "90"
         },
         {
             "image": "train/091/t2.nii.gz",
-            "label": "train/091/empty.nii.gz",
+            "label": "train/091/t2_anatomy_reader1.nii.gz",
             "id": "91"
         },
         {
             "image": "train/092/t2.nii.gz",
-            "label": "train/092/adc_tumor_reader1.nii.gz",
+            "label": "train/092/t2_anatomy_reader1.nii.gz",
             "id": "92"
         },
         {
             "image": "train/093/t2.nii.gz",
-            "label": "train/093/empty.nii.gz",
+            "label": "train/093/t2_anatomy_reader1.nii.gz",
             "id": "93"
         },
         {
             "image": "train/094/t2.nii.gz",
-            "label": "train/094/empty.nii.gz",
+            "label": "train/094/t2_anatomy_reader1.nii.gz",
             "id": "94"
         },
         {
             "image": "train/095/t2.nii.gz",
-            "label": "train/095/empty.nii.gz",
+            "label": "train/095/t2_anatomy_reader1.nii.gz",
             "id": "95"
         },
         {
             "image": "train/096/t2.nii.gz",
-            "label": "train/096/adc_tumor_reader1.nii.gz",
+            "label": "train/096/t2_anatomy_reader1.nii.gz",
             "id": "96"
         },
         {
             "image": "train/097/t2.nii.gz",
-            "label": "train/097/empty.nii.gz",
+            "label": "train/097/t2_anatomy_reader1.nii.gz",
             "id": "97"
         },
         {
             "image": "train/098/t2.nii.gz",
-            "label": "train/098/empty.nii.gz",
+            "label": "train/098/t2_anatomy_reader1.nii.gz",
             "id": "98"
         },
         {
             "image": "train/100/t2.nii.gz",
-            "label": "train/100/adc_tumor_reader1.nii.gz",
+            "label": "train/100/t2_anatomy_reader1.nii.gz",
             "id": "100"
         },
         {
             "image": "train/101/t2.nii.gz",
-            "label": "train/101/adc_tumor_reader1.nii.gz",
+            "label": "train/101/t2_anatomy_reader1.nii.gz",
             "id": "101"
         },
         {
             "image": "train/102/t2.nii.gz",
-            "label": "train/102/empty.nii.gz",
+            "label": "train/102/t2_anatomy_reader1.nii.gz",
             "id": "102"
         },
         {
             "image": "train/103/t2.nii.gz",
-            "label": "train/103/adc_tumor_reader1.nii.gz",
+            "label": "train/103/t2_anatomy_reader1.nii.gz",
             "id": "103"
         },
         {
             "image": "train/104/t2.nii.gz",
-            "label": "train/104/adc_tumor_reader1.nii.gz",
+            "label": "train/104/t2_anatomy_reader1.nii.gz",
             "id": "104"
         },
         {
             "image": "train/105/t2.nii.gz",
-            "label": "train/105/adc_tumor_reader1.nii.gz",
+            "label": "train/105/t2_anatomy_reader1.nii.gz",
             "id": "105"
         },
         {
             "image": "train/106/t2.nii.gz",
-            "label": "train/106/adc_tumor_reader1.nii.gz",
+            "label": "train/106/t2_anatomy_reader1.nii.gz",
             "id": "106"
         },
         {
             "image": "train/107/t2.nii.gz",
-            "label": "train/107/adc_tumor_reader1.nii.gz",
+            "label": "train/107/t2_anatomy_reader1.nii.gz",
             "id": "107"
         },
         {
             "image": "train/108/t2.nii.gz",
-            "label": "train/108/empty.nii.gz",
+            "label": "train/108/t2_anatomy_reader1.nii.gz",
             "id": "108"
         },
         {
             "image": "train/110/t2.nii.gz",
-            "label": "train/110/adc_tumor_reader1.nii.gz",
+            "label": "train/110/t2_anatomy_reader1.nii.gz",
             "id": "110"
         },
         {
             "image": "train/111/t2.nii.gz",
-            "label": "train/111/adc_tumor_reader1.nii.gz",
+            "label": "train/111/t2_anatomy_reader1.nii.gz",
             "id": "111"
         },
         {
             "image": "train/112/t2.nii.gz",
-            "label": "train/112/adc_tumor_reader1.nii.gz",
+            "label": "train/112/t2_anatomy_reader1.nii.gz",
             "id": "112"
         },
         {
             "image": "train/113/t2.nii.gz",
-            "label": "train/113/adc_tumor_reader1.nii.gz",
+            "label": "train/113/t2_anatomy_reader1.nii.gz",
             "id": "113"
         },
         {
             "image": "train/115/t2.nii.gz",
-            "label": "train/115/empty.nii.gz",
+            "label": "train/115/t2_anatomy_reader1.nii.gz",
             "id": "115"
         },
         {
             "image": "train/116/t2.nii.gz",
-            "label": "train/116/empty.nii.gz",
+            "label": "train/116/t2_anatomy_reader1.nii.gz",
             "id": "116"
         },
         {
             "image": "train/117/t2.nii.gz",
-            "label": "train/117/empty.nii.gz",
+            "label": "train/117/t2_anatomy_reader1.nii.gz",
             "id": "117"
         },
         {
             "image": "train/119/t2.nii.gz",
-            "label": "train/119/empty.nii.gz",
+            "label": "train/119/t2_anatomy_reader1.nii.gz",
             "id": "119"
         },
         {
             "image": "train/120/t2.nii.gz",
-            "label": "train/120/empty.nii.gz",
+            "label": "train/120/t2_anatomy_reader1.nii.gz",
             "id": "120"
         },
         {
             "image": "train/121/t2.nii.gz",
-            "label": "train/121/adc_tumor_reader1.nii.gz",
+            "label": "train/121/t2_anatomy_reader1.nii.gz",
             "id": "121"
         },
         {
             "image": "train/122/t2.nii.gz",
-            "label": "train/122/adc_tumor_reader1.nii.gz",
+            "label": "train/122/t2_anatomy_reader1.nii.gz",
             "id": "122"
         },
         {
             "image": "train/123/t2.nii.gz",
-            "label": "train/123/empty.nii.gz",
+            "label": "train/123/t2_anatomy_reader1.nii.gz",
             "id": "123"
         },
         {
             "image": "train/124/t2.nii.gz",
-            "label": "train/124/adc_tumor_reader1.nii.gz",
+            "label": "train/124/t2_anatomy_reader1.nii.gz",
             "id": "124"
         },
         {
             "image": "train/125/t2.nii.gz",
-            "label": "train/125/adc_tumor_reader1.nii.gz",
+            "label": "train/125/t2_anatomy_reader1.nii.gz",
             "id": "125"
         },
         {
             "image": "train/126/t2.nii.gz",
-            "label": "train/126/empty.nii.gz",
+            "label": "train/126/t2_anatomy_reader1.nii.gz",
             "id": "126"
         },
         {
             "image": "train/128/t2.nii.gz",
-            "label": "train/128/empty.nii.gz",
+            "label": "train/128/t2_anatomy_reader1.nii.gz",
             "id": "128"
         },
         {
             "image": "train/129/t2.nii.gz",
-            "label": "train/129/empty.nii.gz",
+            "label": "train/129/t2_anatomy_reader1.nii.gz",
             "id": "129"
         },
         {
             "image": "train/130/t2.nii.gz",
-            "label": "train/130/adc_tumor_reader1.nii.gz",
+            "label": "train/130/t2_anatomy_reader1.nii.gz",
             "id": "130"
         },
         {
             "image": "train/131/t2.nii.gz",
-            "label": "train/131/adc_tumor_reader1.nii.gz",
+            "label": "train/131/t2_anatomy_reader1.nii.gz",
             "id": "131"
         },
         {
             "image": "train/132/t2.nii.gz",
-            "label": "train/132/adc_tumor_reader1.nii.gz",
+            "label": "train/132/t2_anatomy_reader1.nii.gz",
             "id": "132"
         },
         {
             "image": "train/133/t2.nii.gz",
-            "label": "train/133/adc_tumor_reader1.nii.gz",
+            "label": "train/133/t2_anatomy_reader1.nii.gz",
             "id": "133"
         },
         {
             "image": "train/134/t2.nii.gz",
-            "label": "train/134/empty.nii.gz",
+            "label": "train/134/t2_anatomy_reader1.nii.gz",
             "id": "134"
         },
         {
             "image": "train/135/t2.nii.gz",
-            "label": "train/135/empty.nii.gz",
+            "label": "train/135/t2_anatomy_reader1.nii.gz",
             "id": "135"
         },
         {
             "image": "train/136/t2.nii.gz",
-            "label": "train/136/adc_tumor_reader1.nii.gz",
+            "label": "train/136/t2_anatomy_reader1.nii.gz",
             "id": "136"
         },
         {
             "image": "train/137/t2.nii.gz",
-            "label": "train/137/adc_tumor_reader1.nii.gz",
+            "label": "train/137/t2_anatomy_reader1.nii.gz",
             "id": "137"
         },
         {
             "image": "train/138/t2.nii.gz",
-            "label": "train/138/adc_tumor_reader1.nii.gz",
+            "label": "train/138/t2_anatomy_reader1.nii.gz",
             "id": "138"
         },
         {
             "image": "train/139/t2.nii.gz",
-            "label": "train/139/empty.nii.gz",
+            "label": "train/139/t2_anatomy_reader1.nii.gz",
             "id": "139"
         },
         {
             "image": "train/140/t2.nii.gz",
-            "label": "train/140/adc_tumor_reader1.nii.gz",
+            "label": "train/140/t2_anatomy_reader1.nii.gz",
             "id": "140"
         },
         {
             "image": "train/141/t2.nii.gz",
-            "label": "train/141/empty.nii.gz",
+            "label": "train/141/t2_anatomy_reader1.nii.gz",
             "id": "141"
         },
         {
             "image": "train/142/t2.nii.gz",
-            "label": "train/142/empty.nii.gz",
+            "label": "train/142/t2_anatomy_reader1.nii.gz",
             "id": "142"
         },
         {
             "image": "train/143/t2.nii.gz",
-            "label": "train/143/adc_tumor_reader1.nii.gz",
+            "label": "train/143/t2_anatomy_reader1.nii.gz",
             "id": "143"
         },
         {
             "image": "train/144/t2.nii.gz",
-            "label": "train/144/empty.nii.gz",
+            "label": "train/144/t2_anatomy_reader1.nii.gz",
             "id": "144"
         },
         {
             "image": "train/145/t2.nii.gz",
-            "label": "train/145/empty.nii.gz",
+            "label": "train/145/t2_anatomy_reader1.nii.gz",
             "id": "145"
         },
         {
             "image": "train/146/t2.nii.gz",
-            "label": "train/146/adc_tumor_reader1.nii.gz",
+            "label": "train/146/t2_anatomy_reader1.nii.gz",
             "id": "146"
         },
         {
             "image": "train/147/t2.nii.gz",
-            "label": "train/147/empty.nii.gz",
+            "label": "train/147/t2_anatomy_reader1.nii.gz",
             "id": "147"
         },
         {
             "image": "train/148/t2.nii.gz",
-            "label": "train/148/adc_tumor_reader1.nii.gz",
+            "label": "train/148/t2_anatomy_reader1.nii.gz",
             "id": "148"
         },
         {
             "image": "train/149/t2.nii.gz",
-            "label": "train/149/empty.nii.gz",
+            "label": "train/149/t2_anatomy_reader1.nii.gz",
             "id": "149"
         },
         {
             "image": "train/150/t2.nii.gz",
-            "label": "train/150/adc_tumor_reader1.nii.gz",
+            "label": "train/150/t2_anatomy_reader1.nii.gz",
             "id": "150"
         },
         {
             "image": "train/151/t2.nii.gz",
-            "label": "train/151/empty.nii.gz",
+            "label": "train/151/t2_anatomy_reader1.nii.gz",
             "id": "151"
         },
         {
             "image": "train/152/t2.nii.gz",
-            "label": "train/152/adc_tumor_reader1.nii.gz",
+            "label": "train/152/t2_anatomy_reader1.nii.gz",
             "id": "152"
         },
         {
             "image": "train/153/t2.nii.gz",
-            "label": "train/153/adc_tumor_reader1.nii.gz",
+            "label": "train/153/t2_anatomy_reader1.nii.gz",
             "id": "153"
         },
         {
             "image": "train/154/t2.nii.gz",
-            "label": "train/154/adc_tumor_reader1.nii.gz",
+            "label": "train/154/t2_anatomy_reader1.nii.gz",
             "id": "154"
         },
         {
             "image": "train/155/t2.nii.gz",
-            "label": "train/155/empty.nii.gz",
+            "label": "train/155/t2_anatomy_reader1.nii.gz",
             "id": "155"
         },
         {
             "image": "train/156/t2.nii.gz",
-            "label": "train/156/adc_tumor_reader1.nii.gz",
+            "label": "train/156/t2_anatomy_reader1.nii.gz",
             "id": "156"
         },
         {
             "image": "train/157/t2.nii.gz",
-            "label": "train/157/adc_tumor_reader1.nii.gz",
+            "label": "train/157/t2_anatomy_reader1.nii.gz",
             "id": "157"
         },
         {
             "image": "train/158/t2.nii.gz",
-            "label": "train/158/adc_tumor_reader1.nii.gz",
+            "label": "train/158/t2_anatomy_reader1.nii.gz",
             "id": "158"
         }
     ],
     "testing": [
         {
             "image": "train/020/t2.nii.gz",
-            "label": "train/020/adc_tumor_reader1.nii.gz",
+            "label": "train/020/t2_anatomy_reader1.nii.gz",
             "id": "20"
         },
         {
             "image": "train/021/t2.nii.gz",
-            "label": "train/021/adc_tumor_reader1.nii.gz",
+            "label": "train/021/t2_anatomy_reader1.nii.gz",
             "id": "21"
         },
         {
             "image": "train/022/t2.nii.gz",
-            "label": "train/022/empty.nii.gz",
+            "label": "train/022/t2_anatomy_reader1.nii.gz",
             "id": "22"
         },
         {
             "image": "train/023/t2.nii.gz",
-            "label": "train/023/empty.nii.gz",
+            "label": "train/023/t2_anatomy_reader1.nii.gz",
             "id": "23"
         },
         {
             "image": "train/038/t2.nii.gz",
-            "label": "train/038/adc_tumor_reader1.nii.gz",
+            "label": "train/038/t2_anatomy_reader1.nii.gz",
             "id": "38"
         },
         {
             "image": "train/041/t2.nii.gz",
-            "label": "train/041/adc_tumor_reader1.nii.gz",
+            "label": "train/041/t2_anatomy_reader1.nii.gz",
             "id": "41"
         },
         {
             "image": "train/046/t2.nii.gz",
-            "label": "train/046/adc_tumor_reader1.nii.gz",
+            "label": "train/046/t2_anatomy_reader1.nii.gz",
             "id": "46"
         },
         {
             "image": "train/047/t2.nii.gz",
-            "label": "train/047/empty.nii.gz",
+            "label": "train/047/t2_anatomy_reader1.nii.gz",
             "id": "47"
         },
         {
             "image": "train/051/t2.nii.gz",
-            "label": "train/051/adc_tumor_reader1.nii.gz",
+            "label": "train/051/t2_anatomy_reader1.nii.gz",
             "id": "51"
         },
         {
             "image": "train/056/t2.nii.gz",
-            "label": "train/056/empty.nii.gz",
+            "label": "train/056/t2_anatomy_reader1.nii.gz",
             "id": "56"
         },
         {
             "image": "train/060/t2.nii.gz",
-            "label": "train/060/adc_tumor_reader1.nii.gz",
+            "label": "train/060/t2_anatomy_reader1.nii.gz",
             "id": "60"
         },
         {
             "image": "train/061/t2.nii.gz",
-            "label": "train/061/empty.nii.gz",
+            "label": "train/061/t2_anatomy_reader1.nii.gz",
             "id": "61"
         },
         {
             "image": "train/077/t2.nii.gz",
-            "label": "train/077/adc_tumor_reader1.nii.gz",
+            "label": "train/077/t2_anatomy_reader1.nii.gz",
             "id": "77"
         },
         {
             "image": "train/084/t2.nii.gz",
-            "label": "train/084/empty.nii.gz",
+            "label": "train/084/t2_anatomy_reader1.nii.gz",
             "id": "84"
         },
         {
             "image": "train/087/t2.nii.gz",
-            "label": "train/087/empty.nii.gz",
+            "label": "train/087/t2_anatomy_reader1.nii.gz",
             "id": "87"
         },
         {
             "image": "train/099/t2.nii.gz",
-            "label": "train/099/adc_tumor_reader1.nii.gz",
+            "label": "train/099/t2_anatomy_reader1.nii.gz",
             "id": "99"
         },
         {
             "image": "train/109/t2.nii.gz",
-            "label": "train/109/adc_tumor_reader1.nii.gz",
+            "label": "train/109/t2_anatomy_reader1.nii.gz",
             "id": "109"
         },
         {
             "image": "train/114/t2.nii.gz",
-            "label": "train/114/adc_tumor_reader1.nii.gz",
+            "label": "train/114/t2_anatomy_reader1.nii.gz",
             "id": "114"
         },
         {
             "image": "train/118/t2.nii.gz",
-            "label": "train/118/adc_tumor_reader1.nii.gz",
+            "label": "train/118/t2_anatomy_reader1.nii.gz",
             "id": "118"
         },
         {
             "image": "train/127/t2.nii.gz",
-            "label": "train/127/empty.nii.gz",
+            "label": "train/127/t2_anatomy_reader1.nii.gz",
             "id": "127"
         }
     ]

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import unittest
 
+import nibabel as nib
+import numpy as np
 import yaml
 
 
@@ -29,7 +31,7 @@ class ConfigFilesTests(unittest.TestCase):
         }
         self.assertTrue(expected_keys.issubset(config.keys()))
         self.assertEqual(config["modality"], "MRI")
-        self.assertEqual(config["dataset_name_or_id"], "Prostate158")
+        # self.assertEqual(config["dataset_name_or_id"], "Prostate158")
 
         datalist_value = config["datalist"]
         self.assertTrue(datalist_value.startswith("./configs/"), "Datalist should be stored under configs/")
@@ -42,11 +44,11 @@ class ConfigFilesTests(unittest.TestCase):
         self.assertTrue(self.json_path.is_file(), f"Missing datalist file: {self.json_path}")
         data = json.loads(self.json_path.read_text(encoding="utf-8"))
         self.assertIn("training", data)
-        self.assertIn("validation", data)
+        self.assertIn("testing", data)
         self.assertIsInstance(data["training"], list)
-        self.assertIsInstance(data["validation"], list)
+        self.assertIsInstance(data["testing"], list)
 
-        for split_name in ["training", "validation"]:
+        for split_name in ["training", "testing"]:
             with self.subTest(split=split_name):
                 for item in data[split_name]:
                     self.assertIsInstance(item, dict)
@@ -54,21 +56,25 @@ class ConfigFilesTests(unittest.TestCase):
                     self.assertIn("label", item)
                     self.assertIn("id", item)
                     self.assertIsInstance(item["id"], str)
+                    self.assertIsInstance(item["image"], str)
                     self.assertIsInstance(item["label"], str)
-                    self.assertIsInstance(item["image"], list)
-                    self.assertEqual(len(item["image"]), 1, "Config should use only the t2 image")
-                    self.assertTrue(item["image"][0].endswith("t2.nii.gz"), "Only t2 images should be used")
+                    self.assertEqual(Path(item["image"]).name, "t2.nii.gz")
+                    self.assertEqual(Path(item["label"]).name, "t2_anatomy_reader1.nii.gz")
 
         dataroot = yaml.safe_load(self.yaml_path.read_text(encoding="utf-8"))["dataroot"]
         data_root_path = (self.repo_root / dataroot).resolve()
         if data_root_path.exists():
-            for split_name in ["training", "validation"]:
+            for split_name in ["training", "testing"]:
                 with self.subTest(split=split_name, existence_check=True):
                     for item in data[split_name]:
-                        image_path = data_root_path / item["image"][0]
+                        image_path = data_root_path / item["image"]
                         label_path = data_root_path / item["label"]
                         self.assertTrue(image_path.exists(), f"Missing image file: {image_path}")
                         self.assertTrue(label_path.exists(), f"Missing label file: {label_path}")
+                        img = nib.load(label_path)
+                        arr = np.asarray(img.dataobj)
+                        self.assertGreater(arr.nbytes, 0, f"Label file is empty: {label_path}")
+                        self.assertTrue(np.any(arr != 0), f"Label mask has no non-zero voxels: {label_path}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+modality: MRI
+datalist: "./configs/prostate158_folds.json"
+dataroot: "./data/raw/zenodo/prostate158/record-6481141/prostate158_train"
+dataset_name_or_id: Prostate158
+nnunet_preprocessed: "./work_dir/nnUNet_preprocessed"
+nnunet_raw: "./work_dir/nnUNet_raw_data_base"
+nnunet_results: "./work_dir/nnUNet_trained_models"

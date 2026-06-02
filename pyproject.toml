@@ -17,9 +17,10 @@ dependencies = [
   "torchmetrics==1.9.0",
   "einops==0.8.2",
   "fire==0.7.1",
+  "wandb>=0.27.0",
 ]
 
 [tool.uv]
 package = false
 python-downloads = "automatic"
-python-preference = "managed"
+python-preference = "only-managed"

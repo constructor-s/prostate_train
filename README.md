@@ -76,8 +76,10 @@ Start with conversion and preprocessing:
 
 ```bash
 python -m monai.apps.nnunet nnUNetV2Runner convert_dataset --input_config ./configs/prostate158_input.yaml
-python -m monai.apps.nnunet nnUNetV2Runner plan_and_process --input_config ./configs/prostate158_input.yaml
+python -m monai.apps.nnunet nnUNetV2Runner plan_and_process --input_config ./configs/prostate158_input.yaml -pl nnUNetPlannerResEncM
 ```
+
+<!-- TODO: -gpu_memory_target 24 -->
 
 Train a single fold first to verify the GPU setup:
 
@@ -85,14 +87,27 @@ Train a single fold first to verify the GPU setup:
 python -m monai.apps.nnunet nnUNetV2Runner train_single_model \
   --input_config ./configs/prostate158_input.yaml \
   --config 3d_fullres \
-  --fold 0
+  --fold 0 \
+  --trainer_class_name "nnUNetTrainer_1epoch"
 ```
+
+Check GPU specs with `nvidia-smi` and adjust batch size in `work_dir/nnUNet_preprocessed/Dataset158_prostate158_train/nnUNetPlans.json` to maximize GPU utilization without running out of memory.
 
 If you have a GPU available and want a standard training run:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python -m monai.apps.nnunet nnUNetV2Runner train \
   --input_config ./configs/prostate158_input.yaml
+```
+
+```bash
+nnUNet_wandb_enabled=1 \
+nnUNet_wandb_project="prostate158" \
+python -m monai.apps.nnunet nnUNetV2Runner train \
+  --input_config "./configs/prostate158_input.yaml" \
+  --configs "3d_fullres" \
+  --trainer_class_name "nnUNetTrainer_250epochs" \
+  --export_validation_probabilities True
 ```
 
 5. Check outputs.

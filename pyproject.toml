@@ -21,3 +21,5 @@ dependencies = [
 
 [tool.uv]
 package = false
+python-downloads = "automatic"
+python-preference = "managed"

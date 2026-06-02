@@ -5,7 +5,18 @@ description = "A standalone script for downloading the Prostate158 dataset."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "zenodo-get>=3.0.3",
+  "zenodo-get==3.0.3",
+  "monai[all]==1.5.2",
+  "nnunetv2==2.7.0",
+  "nibabel==5.4.2",
+  "SimpleITK==2.5.5",
+  "pydicom==3.0.2",
+  "pandas==2.3.3",
+  "tqdm==4.67.3",
+  "matplotlib==3.10.9",
+  "torchmetrics==1.9.0",
+  "einops==0.8.2",
+  "fire==0.7.1",
 ]
 
 [tool.uv]

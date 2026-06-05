@@ -224,3 +224,4 @@ data/
 uv.lock
 work_dir/
 bundles/
+results/

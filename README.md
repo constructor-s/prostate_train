@@ -123,6 +123,17 @@ ls -lh ./work_dir/nnUNet_trained_models
 6. Run inference later:
 
 ```bash
-python -m monai.apps.nnunet nnUNetV2Runner find_best_configuration --input_config ./configs/prostate158_input.yaml --trainer_class_name "nnUNetTrainer_100epochs"
-python -m monai.apps.nnunet nnUNetV2Runner predict_ensemble_postprocessing --input_config ./configs/prostate158_input.yaml --trainer_class_name "nnUNetTrainer_100epochs" 
+python -m monai.apps.nnunet nnUNetV2Runner find_best_configuration --input_config ./configs/prostate158_input.yaml --trainer_class_name "nnUNetTrainer_100epochs" --configs "3d_fullres" --allow_ensembling=False --folds=0,
+python -m monai.apps.nnunet nnUNetV2Runner find_best_configuration --input_config ./configs/prostate158_input.yaml --trainer_class_name "nnUNetTrainer_100epochs" --configs "3d_fullres"
+python -m monai.apps.nnunet nnUNetV2Runner predict_ensemble_postprocessing --input_config ./configs/prostate158_input.yaml --trainer_class_name "nnUNetTrainer_100epochs" --use_mirroring=False --tile_step_size=0.8
+```
+
+7. Bundle:
+
+```bash
+python generate_bundle.py
+# or
+nnUNet_results="work_dir/nnUNet_trained_models" nnUNetv2_export_model_to_zip \
+  -d Dataset158_prostate158_train -tr nnUNetTrainer_100epochs -p nnUNetPlans -c 3d_fullres \
+  -o bundles/Dataset158_prostate158_train_nnUNetTrainer_100epochs__nnUNetPlans__3d_fullres.zip
 ```

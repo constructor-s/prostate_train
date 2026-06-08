@@ -75,3 +75,53 @@ def build_prostate158_anatomy_cases(
         )
 
     return cases
+
+
+def build_nnunet_test_cases(
+    images_dir: str | Path,
+    labels_dir: str | Path,
+    preds_dir: str | Path,
+) -> list[dict]:
+    """Return a list of cases pairing image, GT label, and nnUNet ensemble prediction.
+
+    Enumerates ``labels_dir`` for ``*.nii.gz`` files and resolves the matching
+    image (``<stem>_0000.nii.gz``) and prediction (``<stem>.nii.gz``) paths.
+
+    Args:
+        images_dir: Directory containing ``case_XXX_0000.nii.gz`` input images.
+        labels_dir: Directory containing ``case_XXX.nii.gz`` ground-truth labels.
+        preds_dir:  Directory containing ``case_XXX.nii.gz`` ensemble predictions.
+
+    Returns:
+        List of dicts, each with keys:
+            ``case_id``    – integer extracted from the case stem
+            ``image_path`` – Path to the input image
+            ``gt_path``    – Path to the ground-truth label
+            ``pred_path``  – Path to the ensemble prediction
+    """
+    images_dir = Path(images_dir)
+    labels_dir = Path(labels_dir)
+    preds_dir = Path(preds_dir)
+
+    cases = []
+    for gt_path in sorted(labels_dir.glob("*.nii.gz")):
+        stem = gt_path.name.replace(".nii.gz", "")  # e.g. "case_119"
+        case_id = int(stem.split("_")[-1])
+        image_path = images_dir / f"{stem}_0000.nii.gz"
+        pred_path = preds_dir / f"{stem}.nii.gz"
+
+        missing = [p for p in (image_path, pred_path) if not p.exists()]
+        if missing:
+            warnings.warn(f"Case {case_id}: skipping, missing {[str(p) for p in missing]}")
+            continue
+
+        cases.append(
+            {
+                "case_id": case_id,
+                "image_path": image_path,
+                "gt_path": gt_path,
+                "pred_path": pred_path,
+            }
+        )
+
+    return cases

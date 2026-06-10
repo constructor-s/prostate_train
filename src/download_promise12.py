@@ -124,6 +124,41 @@ def download_dataset(
     return dataset_dir
 
 
+def generate_csvs(SPLITS = ("training_data", "test_data", "livechallenge_test_data")) -> None:
+    """Generate t2/segmentation CSV files for each PROMISE12 split."""
+    import csv
+    import re
+
+    dataset_dir = dataset_root(Path("data"), DEFAULT_RECORD_ID) / DEFAULT_FOLDER
+    for split in SPLITS:
+        split_dir = dataset_dir / split
+        if not split_dir.is_dir():
+            print(f"Skipping {split}: directory not found at {split_dir}")
+            continue
+
+        images = sorted(
+            (f for f in split_dir.glob("Case??.mhd") if "_segmentation" not in f.name),
+            key=lambda f: int(re.search(r"(\d+)", f.stem).group(1)),
+        )
+
+        rows = []
+        for img in images:
+            case_id = int(re.search(r"(\d+)", img.stem).group(1))
+            seg = split_dir / f"{img.stem}_segmentation.mhd"
+            rows.append({
+                "ID": case_id,
+                "t2": f"{split}/{img.name}",
+                "segmentation": f"{split}/{seg.name}" if seg.exists() else "",
+            })
+
+        out_csv = dataset_dir / f"{split}.csv"
+        with out_csv.open("w", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=["ID", "t2", "segmentation"])
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"Wrote {len(rows)} cases to {out_csv}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -140,6 +175,8 @@ def main() -> None:
         args.data_root, record_id=args.record_id, progress=not args.no_progress
     )
     print(f"Downloaded dataset to {dataset_dir}")
+    generate_csvs()
+    print("Generated CSV files for each split.")
 
 
 if __name__ == "__main__":

@@ -20,10 +20,10 @@ def build_prostate158_anatomy_cases(
     """Return a list of cases pairing T2 image, anatomy GT, and anatomy prediction.
 
     Reads ``train.csv`` or ``valid.csv`` from *dataset_dir* and resolves paths
-    relative to *dataset_dir* (image + GT) and *results_dir* (prediction).
+    relative to *dataset_dir* (image + GT) and *preds_dir* (prediction).
 
     The prediction path mirrors the input T2 path:
-        ``results_dir / <split>/<case_id>/t2/t2_trans.nii.gz``
+        ``preds_dir / <split>/<case_id>/t2/t2_trans.nii.gz``
 
     Cases where the GT or prediction file does not exist are skipped with a
     warning so the caller can proceed with the available subset.
@@ -32,7 +32,7 @@ def build_prostate158_anatomy_cases(
         csv_path:    Path to train.csv or valid.csv.
         dataset_dir: Root directory that the CSV paths are relative to
                      (e.g. ``prostate158_train/``).
-        results_dir: Root directory containing anatomy predictions
+        preds_dir: Root directory containing anatomy predictions
                      (e.g. ``results/anatomy/``).
 
     Returns:
@@ -44,7 +44,7 @@ def build_prostate158_anatomy_cases(
     """
     csv_path = Path(csv_path)
     dataset_dir = Path(dataset_dir)
-    results_dir = Path(results_dir)
+    preds_dir = Path(preds_dir)
 
     df = pd.read_csv(csv_path)
 
@@ -54,11 +54,11 @@ def build_prostate158_anatomy_cases(
         image_path = dataset_dir / row["t2"]
         gt_path = dataset_dir / row["t2_anatomy_reader1"]
 
-        # Prediction lives under results_dir/<split>/<case_id>/t2/t2_trans.nii.gz.
+        # Prediction lives under preds_dir/<split>/<case_id>/t2/t2_trans.nii.gz.
         # The CSV "t2" column is e.g. "train/024/t2.nii.gz"; stripping both
         # suffixes gives "train/024/t2" which is the bundle's output sub-folder.
         t2_stem = Path(row["t2"]).with_suffix("").with_suffix("")  # train/024/t2
-        pred_path = results_dir / t2_stem / "t2_trans.nii.gz"
+        pred_path = preds_dir / t2_stem / "t2_trans.nii.gz"
 
         missing = [p for p in (gt_path, pred_path) if not p.exists()]
         if missing:

@@ -124,6 +124,34 @@ def download_dataset(
     return dataset_dir
 
 
+def convert_to_nifti(dataset_dir: Path) -> None:
+    """Convert all PROMISE12 MHD files to NIfTI, writing to <split>_nii/ directories.
+
+    Segmentation masks are cast to uint8 (labels are 0/1/2). Images are written
+    as-is (int16). Conversion is skipped for a split if the output directory
+    already contains the expected number of .nii.gz files.
+    """
+    import SimpleITK as sitk
+
+    splits = ("training_data", "test_data", "livechallenge_test_data")
+    for split in splits:
+        src_dir = dataset_dir / split
+        if not src_dir.is_dir():
+            continue
+        dst_dir = dataset_dir / f"{split}_nii"
+        mhd_files = list(src_dir.glob("*.mhd"))
+        if dst_dir.is_dir() and len(list(dst_dir.glob("*.nii.gz"))) == len(mhd_files):
+            continue
+        dst_dir.mkdir(exist_ok=True)
+        for mhd in mhd_files:
+            img = sitk.ReadImage(str(mhd))
+            if "_segmentation" in mhd.name:
+                img = sitk.Cast(img, sitk.sitkUInt8)
+            out = dst_dir / (mhd.stem + ".nii.gz")
+            sitk.WriteImage(img, str(out))
+        print(f"Converted {len(mhd_files)} files to {dst_dir}")
+
+
 def generate_csvs(SPLITS = ("training_data", "test_data", "livechallenge_test_data")) -> None:
     """Generate t2/segmentation CSV files for each PROMISE12 split."""
     import csv
@@ -131,24 +159,26 @@ def generate_csvs(SPLITS = ("training_data", "test_data", "livechallenge_test_da
 
     dataset_dir = dataset_root(Path("data"), DEFAULT_RECORD_ID) / DEFAULT_FOLDER
     for split in SPLITS:
-        split_dir = dataset_dir / split
+        split_dir = dataset_dir / f"{split}_nii"
         if not split_dir.is_dir():
             print(f"Skipping {split}: directory not found at {split_dir}")
             continue
 
         images = sorted(
-            (f for f in split_dir.glob("Case??.mhd") if "_segmentation" not in f.name),
+            (f for f in split_dir.glob("Case??.nii.gz") if "_segmentation" not in f.name),
             key=lambda f: int(re.search(r"(\d+)", f.stem).group(1)),
         )
 
         rows = []
         for img in images:
             case_id = int(re.search(r"(\d+)", img.stem).group(1))
-            seg = split_dir / f"{img.stem}_segmentation.mhd"
+            case_stem = img.name.removesuffix(".nii.gz")
+            seg = split_dir / f"{case_stem}_segmentation.nii.gz"
+            assert seg.is_file(), f"Expected segmentation file not found for case {case_id} at {seg}"
             rows.append({
                 "ID": case_id,
-                "t2": f"{split}/{img.name}",
-                "segmentation": f"{split}/{seg.name}" if seg.exists() else "",
+                "t2": f"{split}_nii/{img.name}",
+                "segmentation": f"{split}_nii/{seg.name}",
             })
 
         out_csv = dataset_dir / f"{split}.csv"
@@ -175,6 +205,7 @@ def main() -> None:
         args.data_root, record_id=args.record_id, progress=not args.no_progress
     )
     print(f"Downloaded dataset to {dataset_dir}")
+    convert_to_nifti(dataset_dir)
     generate_csvs()
     print("Generated CSV files for each split.")
 

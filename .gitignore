@@ -222,6 +222,6 @@ __marimo__/
 # They are reproducible via the download script.
 data/
 uv.lock
-work_dir/
+work_dir*/
 bundles/
 results/

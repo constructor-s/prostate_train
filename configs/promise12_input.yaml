@@ -1,0 +1,7 @@
+modality: MRI
+datalist: "configs/promise12_folds.json"
+dataroot: "data/raw/zenodo/promise12/record-8026660/promise12"
+dataset_name_or_id: 12
+nnunet_preprocessed: "work_dir_promise12/nnunet_preprocessed"
+nnunet_raw: "work_dir_promise12/nnunet_raw"
+nnunet_results: "work_dir_promise12/nnunet_results"

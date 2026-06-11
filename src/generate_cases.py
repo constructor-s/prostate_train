@@ -2,13 +2,6 @@
 
 Intended to be imported by evaluation notebooks and scripts so that CSV
 parsing and path resolution logic is not duplicated across files.
-
-Run as a script to generate a folds JSON from CSVs:
-
-    python src/generate_cases.py \\
-        --training data/.../training_data.csv \\
-        --testing  data/.../livechallenge_test_data.csv \\
-        --output   configs/promise12_folds.json
 """
 
 from __future__ import annotations
@@ -66,6 +59,53 @@ def build_prostate158_anatomy_cases(
         # suffixes gives "train/024/t2" which is the bundle's output sub-folder.
         t2_stem = Path(row["t2"]).with_suffix("").with_suffix("")  # train/024/t2
         pred_path = preds_dir / t2_stem / "t2_trans.nii.gz"
+
+        missing = [p for p in (gt_path, pred_path) if not p.exists()]
+        if missing:
+            warnings.warn(f"Case {case_id}: skipping, missing {[str(p) for p in missing]}")
+            continue
+
+        cases.append(
+            {
+                "case_id": case_id,
+                "image_path": image_path,
+                "gt_path": gt_path,
+                "pred_path": pred_path,
+            }
+        )
+
+    return cases
+
+
+def build_prostate158_nnunet_cases(
+    csv_path: str | Path,
+    preds_dir: str | Path,
+) -> list[dict]:
+    """Return cases pairing T2 image, anatomy GT, and nnUNet segmentation prediction.
+
+    Like :func:`build_prostate158_anatomy_cases` but infers *dataset_dir* from
+    *csv_path* and expects predictions named ``<case_id>.nii.gz`` in *preds_dir*
+    (the default nnUNet ensemble output layout).
+
+    Args:
+        csv_path:  Path to train.csv or valid.csv; its parent is used as dataset_dir.
+        preds_dir: Directory containing ``<case_id>.nii.gz`` predictions.
+
+    Returns:
+        List of dicts with keys ``case_id``, ``image_path``, ``gt_path``, ``pred_path``.
+    """
+    csv_path = Path(csv_path)
+    dataset_dir = csv_path.parent
+    preds_dir = Path(preds_dir)
+
+    df = pd.read_csv(csv_path)
+
+    cases = []
+    for _, row in df.iterrows():
+        case_id = int(row["ID"])
+        image_path = dataset_dir / row["t2"]
+        gt_path = dataset_dir / row["t2_anatomy_reader1"]
+        pred_path = preds_dir / f"{case_id}.nii.gz"
 
         missing = [p for p in (gt_path, pred_path) if not p.exists()]
         if missing:
@@ -145,6 +185,53 @@ def build_promise12_cases(
     return cases
 
 
+def build_promise12_nnunet_cases(
+    csv_path: str | Path,
+    preds_dir: str | Path,
+) -> list[dict]:
+    """Return cases pairing T2 image, segmentation GT, and nnUNet prediction.
+
+    Like :func:`build_promise12_cases` but infers *dataset_dir* from *csv_path*
+    and expects predictions named ``<case_id>.nii.gz`` in *preds_dir*.
+
+    Args:
+        csv_path:  Path to training_data.csv or livechallenge_test_data.csv;
+                   its parent is used as dataset_dir.
+        preds_dir: Directory containing ``<case_id>.nii.gz`` predictions.
+
+    Returns:
+        List of dicts with keys ``case_id``, ``image_path``, ``gt_path``, ``pred_path``.
+    """
+    csv_path = Path(csv_path)
+    dataset_dir = csv_path.parent
+    preds_dir = Path(preds_dir)
+
+    df = pd.read_csv(csv_path)
+
+    cases = []
+    for _, row in df.iterrows():
+        case_id = int(row["ID"])
+        image_path = dataset_dir / row["t2"]
+        gt_path = dataset_dir / row["segmentation"]
+        pred_path = preds_dir / f"{case_id}.nii.gz"
+
+        missing = [p for p in (gt_path, pred_path) if not p.exists()]
+        if missing:
+            warnings.warn(f"Case {case_id}: skipping, missing {[str(p) for p in missing]}")
+            continue
+
+        cases.append(
+            {
+                "case_id": case_id,
+                "image_path": image_path,
+                "gt_path": gt_path,
+                "pred_path": pred_path,
+            }
+        )
+
+    return cases
+
+
 def build_nnunet_test_cases(
     images_dir: str | Path,
     labels_dir: str | Path,
@@ -193,57 +280,3 @@ def build_nnunet_test_cases(
         )
 
     return cases
-
-
-def generate_folds_json(
-    splits: list[tuple[str, Path]],
-    image_col: str = "t2",
-    label_col: str = "segmentation",
-    id_col: str = "ID",
-) -> dict:
-    """Build a folds dict from a list of (split_name, csv_path) pairs.
-
-    Args:
-        splits:    List of (split_name, csv_path) pairs, e.g. [("training", Path("train.csv"))].
-        image_col: CSV column name for the image path.
-        label_col: CSV column name for the label/segmentation path.
-        id_col:    CSV column name for the integer case ID.
-
-    Returns:
-        Dict mapping split names to lists of ``{"image": ..., "label": ..., "id": ...}`` dicts.
-    """
-    result: dict[str, list[dict]] = {}
-    for split_name, csv_path in splits:
-        df = pd.read_csv(csv_path)
-        result[split_name] = [
-            {"image": row[image_col], "label": row[label_col], "id": str(int(row[id_col]))}
-            for _, row in df.iterrows()
-        ]
-    return result
-
-
-if __name__ == "__main__":
-    import argparse
-    import json
-
-    parser = argparse.ArgumentParser(
-        description="Generate a folds JSON (MONAI datalist format) from CSV files."
-    )
-    parser.add_argument("--training", type=Path, required=True, metavar="CSV", help="CSV for the training split.")
-    parser.add_argument("--testing", type=Path, required=True, metavar="CSV", help="CSV for the testing split.")
-    parser.add_argument("--output", type=Path, required=True, help="Output JSON path.")
-    parser.add_argument("--image-col", default="t2", help="CSV column for image paths (default: t2).")
-    parser.add_argument("--label-col", default="segmentation", help="CSV column for label paths (default: segmentation).")
-    parser.add_argument("--id-col", default="ID", help="CSV column for case IDs (default: ID).")
-    args = parser.parse_args()
-
-    folds = generate_folds_json(
-        splits=[("training", args.training), ("testing", args.testing)],
-        image_col=args.image_col,
-        label_col=args.label_col,
-        id_col=args.id_col,
-    )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(folds, indent=4))
-    total = sum(len(v) for v in folds.values())
-    print(f"Wrote {total} cases to {args.output}")

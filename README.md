@@ -14,6 +14,18 @@ By default, the dataset is extracted into:
 data/raw/zenodo/prostate158/record-6481141/prostate158_train
 ```
 
+<!-- ## Data setup
+
+```bash
+# Example for PROMISE12. Adjust paths for prostate158.
+python src/generate_cases.py \
+  --training data/raw/zenodo/promise12/record-8026660/promise12/training_data.csv \
+  --testing data/raw/zenodo/promise12/record-8026660/promise12/test_data.csv \
+  --output configs/promise012_folds.json
+
+python -m monai.apps.nnunet nnUNetV2Runner convert_dataset --input_config=configs/promise12_input.yaml --work_dir=data/raw/zenodo/promise12/record-8026660/promise12/training_data_work_dir
+``` -->
+
 ## Preprocess
 
 ```bash
@@ -46,7 +58,7 @@ nnUNet_wandb_enabled=1 \
 nnUNet_wandb_project="prostate158" \
 python -m monai.apps.nnunet nnUNetV2Runner train \
   --input_config "./configs/prostate158_input.yaml" \
-  --configs "3d_fullres" \
+  --configs='["3d_fullres","2d"]' \
   --trainer_class_name "nnUNetTrainer_100epochs" \
   --export_validation_probabilities True
 ```
@@ -86,7 +98,13 @@ python -m monai.apps.nnunet nnUNetV2Runner predict_ensemble_postprocessing --inp
 Custmon MONAI bundle:
 
 ```bash
-python generate_bundle.py
+python src/generate_bundle.py \
+    --model_dir work_dir/nnUNet_trained_models/Dataset158_prostate158_train/nnUNetTrainer_100epochs__nnUNetPlans__3d_fullres
+
+python bundles/Dataset158_prostate158_train_3d_fullres_5fold/scripts/infer.py \
+    --input data/raw/zenodo/promise12/record-8026660/promise12/training_data.csv \
+    --output_folder results/Dataset158_prostate158_train_3d_fullres_5fold/promise12/training_data/ \
+    --no-use_mirroring
 ```
 
 Or nnUNetV2 format bundle:

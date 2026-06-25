@@ -1,135 +1,63 @@
-# AI Agent Guide for prostate_train
+# Manuscript Outline
 
-## Project Overview
+## Introduction
+- One application of prostate segmentation is automated volume prediction.
+- Useful in PI-RADS in calculation of prostate density.
+- Manual measurement is limited to ellipsoid formula, which is an “indirect” measure of volume.
+- Existing machine learning literature focus on reporting DSC, but not physically meaningful volume.
+- nnUNetv2, with correct preprocessing, augmentation, hyperparameters, and postprocessing, has been shown to achieve SOTA performance. (Cite nnUNetv2 revisited paper).
 
-**prostate_train** for downloading and training the Prostate158 medical imaging dataset from Zenodo. It emphasizes reproducibility, clean architecture, and test-driven development.
 
-## Key Conventions
 
-### Data Layout (Reproducible & Extensible)
+## Methods
+- Open source data/models based on only T2-weighted image for practicality:
+1. Derived from Prostate158 open weights MONAI model (“Prostate158-Adams22”) https://project-monai.github.io/model-zoo.html#/model/prostate_mri_anatomy 
+2. Derived from Prostate158, trained 3D nnUNetv2 (“Prostate158-nnUNet”)
+3. Derived from PROMISE12, trained 3D nnUNetv2 (“PROMISE12-nnUNet”)
+- These models were used to predict the segmentation in the PI-CAI dataset.
 
-- **Persistent data**: `data/raw/<source>/<dataset>/record-<id>/...`
-  - Example: `data/raw/zenodo/prostate158/record-6481141/prostate158_train/`
-- **Temporary archives**: `data/tmp/<source>/<dataset>/record-<id>/...` (auto-cleaned after extraction)
-- **Completion marker**: `.complete` sentinel file + `download_manifest.json` for detecting complete vs. partial downloads
-- **Not tracked in git**: All data is in `.gitignore`; it is reproducible via the download script
+- Closed source “silver standard” segmentation on PI-CAI dataset (Bosma22b, Guerbet23, HeviAI23, Yuan23)
+- PI-CAI clinical information, containing prostate_volume, PSA
 
-### Download Safety
+## Results:
+- Inter-rater variability matrix
 
-- Use `zenodo_get` CLI (not custom HTTP) for built-in checksum verification and retries
-- Check for required paths (e.g., `train.csv`, `valid.csv`, `train/`) to detect incomplete downloads
-- Fail fast if a partial download folder is detected (don't silently use corrupt data)
-- Write manifest JSON with metadata (dataset name, source, record ID, required paths) for traceability
+- x axis=average of silver standard volumes, y axis=deviation of each method from the average
 
-### Testing Approach
 
-All changes to `download_prostate158.py` must pass unit tests:
 
-```bash
-python -m unittest discover -s tests -v
-```
 
-Tests use mocking to avoid real Zenodo downloads; they verify:
-1. Fresh downloads create the correct folder structure and metadata
-2. Complete datasets are reused without re-downloading
-3. Partial datasets are rejected with clear errors
 
-When adding features (e.g., new dataset sources), write tests first (`test_download_*.py`), then implement.
+- Confusion matrix for prostate volume and PSAD and PSAD ROC between manual and average of silver standard
 
-## Architecture Notes
 
-**Single-file design**: The downloader is a standalone script (`download_prostate158.py`), not a package. This keeps it simple and easy to integrate into larger workflows.
+- Confusion matrix for prostate volume and PSAD and PSAD ROC between “PROMISE12-3DnnUNet” and average of silver standard
 
-**Extensibility**: The download logic is parameterized (`download_prostate158()` takes `data_root`, `record_id`), making it easy to add support for new datasets without refactoring.
 
-**Idempotency**: Calling the script twice with the same arguments is safe—it skips re-download on the second run.
+- Confusion matrix for prostate volume and PSAD and PSAD ROC between “Prostate158-3DnnUNet” and average of silver standard
 
-## Common Tasks
 
-### Add a New Dataset Source
 
-1. Create a new `download_<dataset>.py` script (or add to `download_prostate158.py` if sharing logic)
-2. Follow the same pattern: `<data_root>/raw/<source>/<dataset>/record-<id>/...`
-3. Write unit tests in `tests/test_download_<dataset>.py` before implementing
-4. Update `README.md` with the new download command
 
-### Modify the Download Logic
 
-1. Write or update tests in `tests/test_download_prostate158.py` first
-2. Run tests to confirm they fail: `python -m unittest discover -s tests -v`
-3. Implement changes to `download_prostate158.py`
-4. Run tests again to confirm they pass
-5. Verify idempotency: run the script twice and confirm the second run skips download
+## Discussion
+- Inter-rater variability in manual ellipsoid from previous studies is higher than inter-rater variability of deep learning algorithms.
+- Therefore, deep learning algorithms provide a more reproducible measurement
 
-### Debug a Download Issue
-
-- Check if data folder exists but is incomplete: `ls data/raw/zenodo/prostate158/record-6481141/prostate158_train/`
-- Look for the `.complete` sentinel: if missing, the download was interrupted
-- Check the manifest: `cat data/raw/zenodo/prostate158/record-6481141/prostate158_train/download_manifest.json`
-- Delete partial data to retry: `rm -rf data/raw/zenodo/prostate158/record-6481141/`
-- Check `data/tmp/` for leftover archives (should be auto-cleaned, but check if interrupted)
-
-## Dependencies & Environment
-
-- **Python**: 3.11+ (specified in `pyproject.toml`)
-- **Package manager**: `uv` (modern, fast Python package manager)
-- **Core dependency**: `zenodo-get>=3.0.3` (handles Zenodo API, checksums, retries)
-- **No heavy dependencies**: intentionally minimal to keep the script lightweight
- - **Dependency policy**: Keep the project's top-level dependency list minimal. Add heavy or optional packages (for experiments or extra utilities) only when needed and record them in `pyproject.toml` or an extras group. This helps keep installs fast, reduces CI load, and avoids version/compatibility surprises for users who only need the downloader.
-
-## Bundle Formats
-
-Two types of model bundles are stored under `bundles/`:
-
-### nnUNet native output bundle
-
-An extracted zip of the raw nnUNet results directory generated by `nnUNetv2_export_model_to_zip`.
-
-```
-bundles/Dataset158_prostate158_train_nnUNetTrainer_100epochs__nnUNetPlans__2d
-bundles/Dataset158_prostate158_train_nnUNetTrainer_100epochs__nnUNetPlans__3d_fullres
-```
-
-- Follows nnUNet naming: `Dataset<id>_<name>/<Trainer>__<Plans>__<config>/fold_X/`
-- Can be loaded with `nnUNetPredictor.initialize_from_trained_model_folder()`
-
-### MONAI-style bundle (directory)
-
-A self-contained directory following the MONAI bundle convention. Used for inference and deployment.
-
-```
-bundles/prostate158_2d_5fold/
-├── models/
-│   ├── dataset.json          # Label map: background=0, class1=1 (TZ), class2=2 (PZ)
-│   ├── plans.json            # nnUNet preprocessing/architecture plan
-│   ├── fold_0/best_model.pt  # Per-fold weights (folds 0–4)
-│   └── ...
-├── scripts/infer.py          # 5-fold ensemble inference entry point
-├── metadata.json             # Bundle metadata
-└── Dockerfile
-```
-
-Run inference with:
-```bash
-python bundles/prostate158_2d_5fold/scripts/infer.py \
-    bundles/prostate158_2d_5fold \
-    <input_folder_with_*_0000.nii.gz> \
-    <output_folder> \
-    --device cpu   # or cuda
-```
-
-Both 2D (`prostate158_2d_5fold`) and 3D (`prostate158_3d_fullres_5fold`) variants exist.
+# Coding Conventions
 
 ## Evaluation
 
-The held-out test split (20 cases) is defined in `configs/prostate158_folds.json` under the `"testing"` key. Evaluation is implemented in `notebooks/evaluate_2d.ipynb`.
+Some models segment two prostate zones:
 
 **Labels** (from `bundles/prostate158_2d_5fold/models/dataset.json`):
 - Label 1 = transition zone (TZ)
 - Label 2 = peripheral zone (PZ)
 - Whole gland = union of labels 1 and 2
 
-**Inference**: 5-fold ensemble via `scripts/infer.py`. Predictions are written to `tmp/eval_output/`. Input images are staged as `tmp/eval_input/<stem>_0000.nii.gz` (nnUNet single-modality naming).
+Some models only segment the whole gland (label 1).
+
+**Inference**: 5-fold ensemble via `scripts/infer.py`.
 
 **Metrics** computed per case × label (volumes in mm³):
 | Metric | Description |
@@ -147,8 +75,6 @@ The held-out test split (20 cases) is defined in `configs/prostate158_folds.json
 
 ```
 prostate_train/
-├── .github/                    # (future) GitHub Actions workflows
-├── .gitignore                  # Ignores data/, tmp/, and uv.lock
 ├── .venv/                      # Virtual environment (not tracked)
 ├── bundles/                    # Trained model bundles (see "Bundle Formats")
 │   ├── prostate158_2d_5fold/           # MONAI-style bundle (2D)
@@ -167,7 +93,6 @@ prostate_train/
 │   └── download_prostate158.py     # Main downloader script
 ├── tests/
 │   └── test_download_prostate158.py
-├── tmp/                        # Scratch outputs: predictions, CSVs, PNGs (not tracked)
 ├── pyproject.toml              # Project metadata & deps
 ├── README.md                   # User-facing quick start
 ├── LICENSE                     # (present)

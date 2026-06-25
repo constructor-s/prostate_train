@@ -3,7 +3,7 @@
 Usage:
     python scripts/infer.py --bundle_root <path> --input <folder|file|csv> --output_folder <path>
 
-CSV input must have a 't2' column with paths relative to --data_root.
+CSV input must have a 't2' column with paths relative to the CSV file's directory.
 """
 import os
 # Set dummy nnUNet environment variable to suppress warnings about missing environment variables. 
@@ -20,6 +20,7 @@ import nibabel
 import numpy as np
 import SimpleITK as sitk
 import torch
+from tqdm import tqdm
 from batchgenerators.utilities.file_and_folder_operations import load_pickle
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from nnunetv2.postprocessing.remove_connected_components import apply_postprocessing_to_folder
@@ -27,6 +28,11 @@ from nnunetv2.postprocessing.remove_connected_components import apply_postproces
 
 def _save_as_nifti(src: str, dst: str) -> None:
     """Load any image format SimpleITK supports and save as NIfTI."""
+    # If suffices are the same, just make a link instead of reading and writing the file.
+    if pathlib.Path(src).suffixes == pathlib.Path(dst).suffixes:
+        os.link(src, dst)
+        return
+    
     sitk_img = sitk.ReadImage(src)
     arr = sitk.GetArrayFromImage(sitk_img).transpose(2, 1, 0)  # (z,y,x) → (x,y,z)
     spacing = sitk_img.GetSpacing()         # (x, y, z)
@@ -85,11 +91,12 @@ def main() -> None:
             rows = list(csv.DictReader(f))
         _tmp_dir_ctx = tempfile.TemporaryDirectory()
         tmp_dir = _tmp_dir_ctx.name
-        for row in rows:
+        for row in tqdm(rows, desc="Converting images to NIfTI", delay=5):
             src = str(data_root / row["t2"])
             dst = os.path.join(tmp_dir, f"{row['ID']}_0000.nii.gz")
             _save_as_nifti(src, dst)
         list_of_lists_or_source_folder = tmp_dir
+        print(f"Converted {len(rows)} images to NIfTI in temporary folder {tmp_dir}")
     elif input_path.is_file():
         list_of_lists_or_source_folder = [[str(input_path)]]
     else:
@@ -126,6 +133,7 @@ def main() -> None:
 
         pp_pkl = models_dir / "postprocessing.pkl"
         if pp_pkl.exists():
+            print(f"Applying postprocessing from {pp_pkl} to {args.output_folder}")
             pp_fns, pp_fn_kwargs = load_pickle(str(pp_pkl))
             apply_postprocessing_to_folder(
                 input_folder=args.output_folder,
@@ -134,7 +142,7 @@ def main() -> None:
                 pp_fn_kwargs=pp_fn_kwargs,
                 plans_file_or_dict=str(models_dir / "plans.json"),
                 dataset_json_file_or_dict=str(models_dir / "dataset.json"),
-                num_processes=args.num_processes_segmentation_export,
+                # num_processes=args.num_processes_segmentation_export,
             )
         else:
             print(f"Warning: {pp_pkl} not found, skipping postprocessing.")

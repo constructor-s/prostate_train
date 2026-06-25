@@ -155,23 +155,21 @@ def build_picai_infer_csv(
     label_cols = {}
     for d in (label_dirs or []):
         p = Path(d).resolve()
-        col = "_".join(p.parts[-3:]).lower()
+        col = "_".join(p.parts[-3:]).lower() # e.g. "picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b" → "whole_gland_ai_bosma22b"
         label_cols[col] = p
 
     fieldnames = ["ID", "t2"] + list(label_cols)
 
     rows = []
-    for patient_dir in sorted(images_dir.iterdir()):
-        if not patient_dir.is_dir():
-            continue
-        t2w_files = list(patient_dir.glob("*_t2w.*"))
-        if not t2w_files:
-            continue
-        row: dict[str, str] = {"ID": patient_dir.name, "t2": os.path.relpath(t2w_files[0], csv_root)}
+    for t2w_file in sorted(images_dir.rglob("*_t2w.*")):
+        # Get the part of the filename before _t2w
+        id_ = t2w_file.stem.rsplit("_t2w", maxsplit=1)[0]
+        row: dict[str, str] = {"ID": id_, "t2": os.path.relpath(t2w_file, csv_root)}
         for col, label_dir in label_cols.items():
-            matches = sorted(label_dir.glob(f"{patient_dir.name}_*.nii.gz"))
-            row[col] = os.path.relpath(matches[0], csv_root) if matches else ""
-        rows.append(row)
+            label_file = label_dir / f"{id_}.nii.gz"
+            assert label_file.exists(), f"Expected label file {label_file} does not exist."
+            row[col] = os.path.relpath(label_file, csv_root)
+        rows.append(row)            
 
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with open(output_csv, "w", newline="") as f:

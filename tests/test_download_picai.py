@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -70,6 +71,94 @@ class DownloadPicaiTests(unittest.TestCase):
 
             with self.assertRaises(RuntimeError):
                 download_picai.download_picai(data_root, progress=False)
+
+
+class BuildPicaiInferCsvTests(unittest.TestCase):
+    def _make_tree(self, root: Path, patients: list[str], label_dirs: list[str]) -> None:
+        """Create a fake images/ tree and label directories under root."""
+        for patient_id in patients:
+            patient_dir = root / "images" / patient_id
+            patient_dir.mkdir(parents=True)
+            (patient_dir / f"{patient_id}_1000001_t2w.mha").touch()
+            (patient_dir / f"{patient_id}_1000001_adc.mha").touch()
+
+        for rel_label_dir in label_dirs:
+            label_dir = root / rel_label_dir
+            label_dir.mkdir(parents=True)
+            for patient_id in patients:
+                (label_dir / f"{patient_id}_1000001.nii.gz").touch()
+
+    def test_basic_csv_without_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_tree(root, ["10001", "10002"], [])
+            output_csv = root / "out.csv"
+
+            download_picai.build_picai_infer_csv(root / "images", output_csv)
+
+            with output_csv.open() as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual([r["ID"] for r in rows], ["10001", "10002"])
+            self.assertTrue(rows[0]["t2"].endswith("_t2w.mha"))
+            self.assertNotIn("adc", rows[0]["t2"])
+
+    def test_csv_with_label_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            label_dirs = ["labels/AI/Bosma22b", "labels/AI/Guerbet23"]
+            self._make_tree(root, ["10001", "10002"], label_dirs)
+            output_csv = root / "out.csv"
+
+            download_picai.build_picai_infer_csv(
+                root / "images",
+                output_csv,
+                label_dirs=[root / d for d in label_dirs],
+            )
+
+            with output_csv.open() as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual(list(rows[0].keys()), ["ID", "t2", "labels_ai_bosma22b", "labels_ai_guerbet23"])
+            self.assertTrue(rows[0]["labels_ai_bosma22b"].endswith(".nii.gz"))
+            self.assertTrue(rows[1]["labels_ai_guerbet23"].endswith(".nii.gz"))
+
+    def test_missing_label_file_is_empty_string(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_tree(root, ["10001", "10002"], [])
+            label_dir = root / "labels" / "AI" / "Bosma22b"
+            label_dir.mkdir(parents=True)
+            # Only create a label for 10001, not 10002
+            (label_dir / "10001_1000001.nii.gz").touch()
+            output_csv = root / "out.csv"
+
+            download_picai.build_picai_infer_csv(
+                root / "images",
+                output_csv,
+                label_dirs=[label_dir],
+            )
+
+            with output_csv.open() as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual(rows[0]["labels_ai_bosma22b"], str(Path("labels/AI/Bosma22b/10001_1000001.nii.gz")))
+            self.assertEqual(rows[1]["labels_ai_bosma22b"], "")
+
+    def test_paths_are_relative_to_csv_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_tree(root, ["10001"], ["labels/AI/Bosma22b"])
+            output_csv = root / "out.csv"
+
+            download_picai.build_picai_infer_csv(
+                root / "images",
+                output_csv,
+                label_dirs=[root / "labels/AI/Bosma22b"],
+            )
+
+            with output_csv.open() as f:
+                rows = list(csv.DictReader(f))
+            # All paths must be relative (no leading slash)
+            for col in ("t2", "labels_ai_bosma22b"):
+                self.assertFalse(rows[0][col].startswith("/"), f"{col} path should be relative")
 
 
 if __name__ == "__main__":

@@ -232,6 +232,60 @@ def build_promise12_nnunet_cases(
     return cases
 
 
+def build_promise12_nnunet_runner_cases(
+    csv_path: str | Path,
+    preds_dir: str | Path,
+    segmentation_key: str = "segmentation"
+) -> list[dict]:
+    """Return cases pairing T2 image, segmentation GT, and nnUNetV2Runner prediction.
+
+    Matches CSV rows (sorted by ID) to prediction files (sorted by case index)
+    positionally, so the offset introduced by MONAI's sequential naming is handled
+    automatically without requiring knowledge of the training set size.
+
+    Args:
+        csv_path:  Path to test_data.csv; its parent is used as dataset_dir.
+        preds_dir: Directory containing ``case_<N>.nii.gz`` predictions.
+
+    Returns:
+        List of dicts with keys ``case_id``, ``image_path``, ``gt_path``, ``pred_path``.
+    """
+    csv_path = Path(csv_path)
+    dataset_dir = csv_path.parent
+    preds_dir = Path(preds_dir)
+
+    df = pd.read_csv(csv_path).sort_values("ID").reset_index(drop=True)
+    pred_files = sorted(preds_dir.glob("*.nii.gz"))
+
+    if len(pred_files) != len(df):
+        warnings.warn(
+            f"Prediction count ({len(pred_files)}) differs from CSV rows ({len(df)}); "
+            "pairing by position may be incorrect."
+        )
+
+    cases = []
+    for (_, row), pred_path in zip(df.iterrows(), pred_files):
+        case_id = int(row["ID"])
+        image_path = dataset_dir / row["t2"]
+        gt_path = dataset_dir / row[segmentation_key]
+
+        missing = [p for p in (gt_path, pred_path) if not p.exists()]
+        if missing:
+            warnings.warn(f"Case {case_id}: skipping, missing {[str(p) for p in missing]}")
+            continue
+
+        cases.append(
+            {
+                "case_id": case_id,
+                "image_path": image_path,
+                "gt_path": gt_path,
+                "pred_path": pred_path,
+            }
+        )
+
+    return cases
+
+
 def build_nnunet_test_cases(
     images_dir: str | Path,
     labels_dir: str | Path,

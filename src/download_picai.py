@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -124,6 +126,58 @@ def download_picai(data_root: Path, record_id: int = DEFAULT_RECORD_ID, progress
         raise RuntimeError(f"Download completed but dataset was not marked complete at {dataset_dir}.")
 
     return dataset_dir
+
+
+def build_picai_infer_csv(
+    images_dir: str | Path,
+    output_csv: str | Path,
+    label_dirs: list[str | Path] | None = None,
+) -> None:
+    """Write a CSV index for all PICAI t2w images, optionally including label paths.
+
+    Scans *images_dir* for patient subfolders and finds the ``*_t2w.mha`` file
+    in each. Writes *output_csv* with paths relative to the CSV's parent directory.
+
+    Column names for label directories are derived from the last two path parts
+    joined by ``_`` and lowercased (e.g. ``AI/Bosma22b`` → ``ai_bosma22b``).
+    If no matching file exists for a patient in a label directory, that cell is
+    left empty.
+
+    Args:
+        images_dir: Directory of per-patient subfolders (e.g. ``record-6624726/images``).
+        output_csv: Destination CSV path; all paths are relative to its parent.
+        label_dirs: Optional list of label directories to include as extra columns.
+    """
+    images_dir = Path(images_dir).resolve()
+    output_csv = Path(output_csv).resolve()
+    csv_root = output_csv.parent
+
+    label_cols = {}
+    for d in (label_dirs or []):
+        p = Path(d).resolve()
+        col = "_".join(p.parts[-3:]).lower()
+        label_cols[col] = p
+
+    fieldnames = ["ID", "t2"] + list(label_cols)
+
+    rows = []
+    for patient_dir in sorted(images_dir.iterdir()):
+        if not patient_dir.is_dir():
+            continue
+        t2w_files = list(patient_dir.glob("*_t2w.*"))
+        if not t2w_files:
+            continue
+        row: dict[str, str] = {"ID": patient_dir.name, "t2": os.path.relpath(t2w_files[0], csv_root)}
+        for col, label_dir in label_cols.items():
+            matches = sorted(label_dir.glob(f"{patient_dir.name}_*.nii.gz"))
+            row[col] = os.path.relpath(matches[0], csv_root) if matches else ""
+        rows.append(row)
+
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_csv, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def parse_args() -> argparse.Namespace:

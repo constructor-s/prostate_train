@@ -18,10 +18,22 @@ dependencies = [
   "wandb==0.27.1",
   "ipykernel==7.2.0",
   "ipywidgets==8.1.8",
-  "pingouin>=0.6.1",
+  "pingouin==0.6.1",
+  "tcia-utils==3.3.2",
+  "idc-index==0.12.3",
+  # pydicom-seg 0.4.1 imports pydicom._storage_sopclass_uids which was removed
+  # in pydicom 3.x. Two files were patched manually in the venv with a try/except
+  # fallback to pydicom.uid:
+  #   .venv/lib/python3.12/site-packages/pydicom_seg/reader.py
+  #   .venv/lib/python3.12/site-packages/pydicom_seg/segmentation_dataset.py
+  # If you reinstall, re-apply the patch to both files:
+  #   s/from pydicom._storage_sopclass_uids import SegmentationStorage/
+  #   try:\n    from pydicom._storage_sopclass_uids import SegmentationStorage\n  except ImportError:\n    from pydicom.uid import SegmentationStorage
+  "pydicom-seg>=0.4.1",
 ]
 
 [tool.uv]
+override-dependencies = ["pandas==2.3.3"]
 package = false
 python-downloads = "automatic"
 python-preference = "only-managed"

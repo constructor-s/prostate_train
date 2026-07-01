@@ -12,7 +12,8 @@ Output layout under dataset_dir:
   labels_nrrd/slicer/   extracted multi-component NRRD segmentations (5 cases)
   labels_nrrd/isbi/     extracted NCI-ISBI challenge NRRD segmentations (30 cases)
   labels_nii/slicer/    slicer NRRD segmentations converted to NIfTI
-  labels_nii/isbi/      ISBI challenge NRRD segmentations converted to NIfTI
+  labels_nii/isbi/      ISBI challenge NRRD segmentations converted to NIfTI (zonal)
+  labels_nii/isbi_wg/   ISBI challenge segmentations binarized to whole gland (label > 0)
   metadata/             clinical metadata XLS
   index.csv             one row per subject with an ISBI segmentation available
 """
@@ -35,7 +36,7 @@ DATASET_NAME = "prostate_diagnosis"
 COLLECTION = "PROSTATE-DIAGNOSIS"
 COMPLETION_SENTINEL = ".complete"
 MANIFEST_NAME = "download_manifest.json"
-REQUIRED_PATHS = ("images_nii", "labels_nii/isbi")
+REQUIRED_PATHS = ("images_nii", "labels_nii/isbi", "labels_nii/isbi_wg")
 
 TCIA_MANIFEST_URL = "https://www.cancerimagingarchive.net/wp-content/uploads/TCIA_PROSTATE-DIAGNOSIS_06-22-2015.tcia"
 METADATA_URL = "https://www.cancerimagingarchive.net/wp-content/uploads/ProstateDiagnosis_metadata-05-07-2012.xlsx"
@@ -123,7 +124,15 @@ def _download_and_extract_nrrd(url: str, dest_dir: Path, tmp_dir: Path, tmp_name
 
 
 def convert_images_to_nifti(dataset_dir: Path) -> None:
-    """Convert downloaded DICOM series to NIfTI in images_nii/, named by PatientID."""
+    """Convert downloaded T2W_TSE_AX DICOM series to NIfTI in images_nii/.
+
+    Patients can have multiple series (T1, dynamic-contrast, coronal, and
+    sometimes more than one T2W_TSE_AX acquisition); only axial T2W_TSE_AX
+    series are converted, since that's what the ISBI labels were segmented
+    on. Each qualifying series is written as {PatientID}__{index}.nii.gz so
+    build_index_csv can match the one whose geometry corresponds to a given
+    label.
+    """
     import SimpleITK as sitk
 
     images_dir = dataset_dir / "images"
@@ -131,30 +140,40 @@ def convert_images_to_nifti(dataset_dir: Path) -> None:
         return
     out_dir = dataset_dir / "images_nii"
     out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
+
+    meta_reader = sitk.ImageFileReader()
+    meta_reader.LoadPrivateTagsOn()
+
+    candidates_by_patient: dict[str, list[list[str]]] = {}
     for series_dir in sorted(d for d in images_dir.iterdir() if d.is_dir()):
         dicom_names = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(str(series_dir))
         if not dicom_names:
             continue
-        meta_reader = sitk.ImageFileReader()
         meta_reader.SetFileName(dicom_names[0])
-        meta_reader.LoadPrivateTagsOn()
         meta_reader.ReadImageInformation()
         if not meta_reader.HasMetaDataKey("0010|0020"):
             continue
         patient_id = meta_reader.GetMetaData("0010|0020").strip()
-        out_path = out_dir / f"{patient_id}.nii.gz"
-        if out_path.exists():
+        description = meta_reader.GetMetaData("0008|103e").strip() if meta_reader.HasMetaDataKey("0008|103e") else ""
+        if "t2w_tse_ax" not in description.lower():
             continue
-        series_reader = sitk.ImageSeriesReader()
-        series_reader.SetFileNames(dicom_names)
-        sitk.WriteImage(series_reader.Execute(), str(out_path))
-        count += 1
+        candidates_by_patient.setdefault(patient_id, []).append(dicom_names)
+
+    count = 0
+    for patient_id, candidates in candidates_by_patient.items():
+        for idx, dicom_names in enumerate(candidates):
+            out_path = out_dir / f"{patient_id}__{idx}.nii.gz"
+            if out_path.exists():
+                continue
+            series_reader = sitk.ImageSeriesReader()
+            series_reader.SetFileNames(dicom_names)
+            sitk.WriteImage(series_reader.Execute(), str(out_path))
+            count += 1
     if count:
-        print(f"Converted {count} series to {out_dir}")
+        print(f"Converted {count} T2W_TSE_AX series to {out_dir}")
 
 
-def _convert_nrrd_dir(nrrd_dir: Path, out_dir: Path) -> int:
+def _convert_nrrd_dir(nrrd_dir: Path, out_dir: Path, binarize: bool = False) -> int:
     import SimpleITK as sitk
 
     if not nrrd_dir.is_dir():
@@ -165,13 +184,16 @@ def _convert_nrrd_dir(nrrd_dir: Path, out_dir: Path) -> int:
         out_path = out_dir / f"{nrrd_file.stem}.nii.gz"
         if out_path.exists():
             continue
-        sitk.WriteImage(sitk.ReadImage(str(nrrd_file)), str(out_path))
+        img = sitk.ReadImage(str(nrrd_file))
+        if binarize:
+            img = sitk.Cast(img > 0, sitk.sitkUInt8)
+        sitk.WriteImage(img, str(out_path))
         count += 1
     return count
 
 
 def convert_labels_to_nifti(dataset_dir: Path) -> None:
-    """Convert extracted NRRD segmentations to NIfTI in labels_nii/{slicer,isbi}/."""
+    """Convert extracted NRRD segmentations to NIfTI in labels_nii/{slicer,isbi,isbi_wg}/."""
     slicer_count = _convert_nrrd_dir(
         dataset_dir / "labels_nrrd" / "slicer", dataset_dir / "labels_nii" / "slicer"
     )
@@ -184,42 +206,60 @@ def convert_labels_to_nifti(dataset_dir: Path) -> None:
     if isbi_count:
         print(f"Converted {isbi_count} isbi labels to {dataset_dir / 'labels_nii' / 'isbi'}")
 
-
-def _case_suffix(stem: str) -> str | None:
-    """Extract the 4-digit case number (e.g. '0006') from an NRRD/label stem, if present."""
-    match = re.search(r"(\d{4})", stem)
-    return match.group(1) if match else None
+    isbi_wg_count = _convert_nrrd_dir(
+        dataset_dir / "labels_nrrd" / "isbi", dataset_dir / "labels_nii" / "isbi_wg", binarize=True
+    )
+    if isbi_wg_count:
+        print(f"Converted {isbi_wg_count} isbi labels to whole gland in {dataset_dir / 'labels_nii' / 'isbi_wg'}")
 
 
 def build_index_csv(dataset_dir: Path) -> None:
-    """Write index.csv pairing image and ISBI-challenge label NIfTI paths by case suffix."""
+    """Write index.csv pairing ISBI-challenge labels with their corresponding image NIfTI paths.
+
+    Patients can have multiple candidate T2W_TSE_AX images (see
+    convert_images_to_nifti); the candidate whose size matches the label's
+    size is selected, since that's the series the label was segmented on.
+    """
+    import SimpleITK as sitk
+
     images_dir = dataset_dir / "images_nii"
     labels_dir = dataset_dir / "labels_nii" / "isbi"
+    labels_wg_dir = dataset_dir / "labels_nii" / "isbi_wg"
     if not images_dir.is_dir() or not labels_dir.is_dir():
         return
 
-    label_by_suffix = {}
-    for label_file in sorted(labels_dir.glob("*.nii.gz")):
-        suffix = _case_suffix(label_file.stem.removesuffix(".nii"))
-        if suffix:
-            label_by_suffix[suffix] = label_file
-
     rows = []
-    for image_file in sorted(images_dir.glob("*.nii.gz")):
-        patient_id = image_file.stem.removesuffix(".nii")
-        suffix = _case_suffix(patient_id)
-        label_file = label_by_suffix.get(suffix) if suffix else None
-        if label_file is None:
+    for label_file in sorted(labels_dir.glob("*.nii.gz")):
+        match = re.match(r"(ProstateDx-\d{2}-\d{4})", label_file.stem.removesuffix(".nii"))
+        if not match:
+            print(f"Warning: skipping {label_file}: filename does not match expected pattern")
+            continue
+        patient_id = match.group(1)
+        candidates = sorted(images_dir.glob(f"{patient_id}__*.nii.gz"))
+        if not candidates:
+            print(f"Warning: skipping {label_file}: no candidate image found for {patient_id}")
+            continue
+        label_size = sitk.ReadImage(str(label_file)).GetSize()
+        image_file = next(
+            (c for c in candidates if sitk.ReadImage(str(c)).GetSize() == label_size), None
+        )
+        if image_file is None:
+            print(f"Warning: skipping {label_file}: no candidate image matches label size {label_size}")
+            continue
+        label_wg_file = labels_wg_dir / label_file.name
+        if not label_wg_file.exists():
+            print(f"Warning: skipping {label_file}: no whole-gland label found at {label_wg_file}")
             continue
         rows.append({
             "ID": patient_id,
             "t2": os.path.relpath(image_file, dataset_dir),
             "label": os.path.relpath(label_file, dataset_dir),
+            "label_wg": os.path.relpath(label_wg_file, dataset_dir),
         })
 
     output_csv = dataset_dir / "index.csv"
     with open(output_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["ID", "t2", "label"])
+        writer = csv.DictWriter(f, fieldnames=["ID", "t2", "label", "label_wg"])
         writer.writeheader()
         writer.writerows(rows)
     print(f"Wrote {len(rows)} rows to {output_csv}")

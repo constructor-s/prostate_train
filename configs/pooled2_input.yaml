@@ -1,0 +1,7 @@
+modality: MRI
+datalist: "configs/pooled2_folds.json"
+dataroot: "data/raw"
+dataset_name_or_id: 274
+nnunet_preprocessed: "work_dir_pooled2/nnunet_preprocessed"
+nnunet_raw: "work_dir_pooled2/nnunet_raw"
+nnunet_results: "work_dir_pooled2/nnunet_results"

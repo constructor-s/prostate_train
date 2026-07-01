@@ -1,0 +1,1376 @@
+{
+    "training": [
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/024/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/024/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_24"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/025/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/025/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_25"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/026/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/026/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_26"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/027/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/027/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_27"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/028/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/028/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_28"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/029/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/029/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_29"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/030/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/030/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_30"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/031/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/031/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_31"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/032/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/032/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_32"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/033/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/033/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_33"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/034/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/034/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_34"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/035/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/035/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_35"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/036/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/036/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_36"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/037/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/037/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_37"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/039/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/039/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_39"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/040/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/040/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_40"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/042/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/042/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_42"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/043/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/043/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_43"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/044/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/044/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_44"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/045/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/045/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_45"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/048/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/048/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_48"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/049/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/049/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_49"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/050/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/050/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_50"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/052/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/052/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_52"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/053/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/053/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_53"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/054/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/054/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_54"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/055/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/055/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_55"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/057/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/057/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_57"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/058/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/058/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_58"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/059/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/059/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_59"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/062/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/062/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_62"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/063/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/063/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_63"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/064/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/064/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_64"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/065/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/065/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_65"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/066/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/066/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_66"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/067/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/067/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_67"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/068/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/068/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_68"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/069/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/069/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_69"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/070/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/070/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_70"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/071/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/071/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_71"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/072/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/072/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_72"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/073/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/073/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_73"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/074/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/074/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_74"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/075/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/075/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_75"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/076/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/076/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_76"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/078/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/078/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_78"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/079/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/079/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_79"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/080/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/080/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_80"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/081/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/081/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_81"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/082/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/082/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_82"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/083/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/083/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_83"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/085/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/085/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_85"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/086/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/086/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_86"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/088/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/088/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_88"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/089/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/089/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_89"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/090/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/090/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_90"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/091/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/091/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_91"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/092/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/092/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_92"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/093/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/093/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_93"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/094/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/094/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_94"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/095/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/095/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_95"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/096/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/096/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_96"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/097/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/097/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_97"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/098/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/098/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_98"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/100/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/100/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_100"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/101/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/101/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_101"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/102/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/102/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_102"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/103/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/103/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_103"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/104/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/104/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_104"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/105/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/105/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_105"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/106/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/106/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_106"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/107/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/107/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_107"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/108/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/108/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_108"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/110/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/110/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_110"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/111/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/111/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_111"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/112/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/112/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_112"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/113/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/113/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_113"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/115/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/115/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_115"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/116/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/116/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_116"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/117/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/117/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_117"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/119/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/119/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_119"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/120/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/120/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_120"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/121/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/121/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_121"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/122/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/122/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_122"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/123/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/123/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_123"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/124/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/124/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_124"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/125/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/125/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_125"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/126/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/126/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_126"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/128/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/128/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_128"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/129/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/129/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_129"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/130/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/130/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_130"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/131/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/131/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_131"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/132/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/132/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_132"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/133/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/133/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_133"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/134/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/134/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_134"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/135/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/135/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_135"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/136/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/136/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_136"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/137/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/137/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_137"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/138/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/138/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_138"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/139/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/139/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_139"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/140/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/140/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_140"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/141/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/141/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_141"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/142/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/142/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_142"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/143/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/143/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_143"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/144/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/144/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_144"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/145/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/145/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_145"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/146/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/146/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_146"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/147/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/147/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_147"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/148/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/148/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_148"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/149/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/149/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_149"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/150/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/150/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_150"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/151/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/151/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_151"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/152/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/152/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_152"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/153/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/153/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_153"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/154/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/154/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_154"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/155/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/155/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_155"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/156/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/156/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_156"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/157/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/157/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_157"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/158/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/158/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_158"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00001_19940620_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00001_19940620_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00001_19940620"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00001_19940702_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00001_19940702_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00001_19940702"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00002_19940709_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00002_19940709_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00002_19940709"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00002_19940723_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00002_19940723_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00002_19940723"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00003_19940811_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00003_19940811_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00003_19940811"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00003_19940825_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00003_19940825_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00003_19940825"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00004_19940903_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00004_19940903_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00004_19940903"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00004_19940912_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00004_19940912_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00004_19940912"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00005_19940910_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00005_19940910_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00005_19940910"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00005_19940917_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00005_19940917_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00005_19940917"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00006_19940924_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00006_19940924_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00006_19940924"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00006_19941001_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00006_19941001_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00006_19941001"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00007_19941001_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00007_19941001_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00007_19941001"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00007_19941008_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00007_19941008_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00007_19941008"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00008_19950617_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00008_19950617_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00008_19950617"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00008_19950701_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00008_19950701_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00008_19950701"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00009_19950701_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00009_19950701_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00009_19950701"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00009_19950708_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00009_19950708_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00009_19950708"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00011_19950826_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00011_19950826_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00011_19950826"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00011_19950908_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00011_19950908_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00011_19950908"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00013_19960222_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00013_19960222_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00013_19960222"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00013_19960307_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00013_19960307_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00013_19960307"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00014_19960316_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00014_19960316_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00014_19960316"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00014_19960324_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00014_19960324_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00014_19960324"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00015_19960502_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00015_19960502_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00015_19960502"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00015_19960516_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00015_19960516_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00015_19960516"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0055__1.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0055.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0055"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0023__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0023.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0023"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0028__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0028.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0028"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0080__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0080.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0080"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0073__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0073.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0073"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0042__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0042.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0042"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0001__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0001.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0001"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0013__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0013.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0013"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0054__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0054.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0054"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0014__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0014.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0014"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0043__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0043.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0043"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0038__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0038.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0038"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0063__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0063.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0063"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0005__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0005.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0005"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0006__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0006_correctedLabels.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0006"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0074__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0074.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0074"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0011__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0011.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0011"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0060__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0060.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0060"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0075__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0075.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0075"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0056__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0056.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0056"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0082__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0082.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0082"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0059__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0059.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0059"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0021__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0021.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0021"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0035__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0035.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0035"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0044__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0044.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0044"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0058__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0058.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0058"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0019__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0019.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0019"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case09.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case09_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_09"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case04.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case04_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_04"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case47.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case47_segmentation.nii.gz",
+            "id": "promise12_training_data_47"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case12.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case12_segmentation.nii.gz",
+            "id": "promise12_test_data_12"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case19.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case19_segmentation.nii.gz",
+            "id": "promise12_test_data_19"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case31.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case31_segmentation.nii.gz",
+            "id": "promise12_training_data_31"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case09.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case09_segmentation.nii.gz",
+            "id": "promise12_training_data_09"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case35.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case35_segmentation.nii.gz",
+            "id": "promise12_training_data_35"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case05.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case05_segmentation.nii.gz",
+            "id": "promise12_training_data_05"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case46.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case46_segmentation.nii.gz",
+            "id": "promise12_training_data_46"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case26.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case26_segmentation.nii.gz",
+            "id": "promise12_test_data_26"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case06.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case06_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_06"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case09.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case09_segmentation.nii.gz",
+            "id": "promise12_test_data_09"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case10.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case10_segmentation.nii.gz",
+            "id": "promise12_test_data_10"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case29.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case29_segmentation.nii.gz",
+            "id": "promise12_training_data_29"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case14.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case14_segmentation.nii.gz",
+            "id": "promise12_test_data_14"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case15.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case15_segmentation.nii.gz",
+            "id": "promise12_test_data_15"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case43.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case43_segmentation.nii.gz",
+            "id": "promise12_training_data_43"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case07.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case07_segmentation.nii.gz",
+            "id": "promise12_training_data_07"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case28.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case28_segmentation.nii.gz",
+            "id": "promise12_test_data_28"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case17.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case17_segmentation.nii.gz",
+            "id": "promise12_test_data_17"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case44.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case44_segmentation.nii.gz",
+            "id": "promise12_training_data_44"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case23.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case23_segmentation.nii.gz",
+            "id": "promise12_test_data_23"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case20.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case20_segmentation.nii.gz",
+            "id": "promise12_test_data_20"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case32.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case32_segmentation.nii.gz",
+            "id": "promise12_training_data_32"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case02.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case02_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_02"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case38.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case38_segmentation.nii.gz",
+            "id": "promise12_training_data_38"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case14.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case14_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_14"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case26.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case26_segmentation.nii.gz",
+            "id": "promise12_training_data_26"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case24.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case24_segmentation.nii.gz",
+            "id": "promise12_test_data_24"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case03.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case03_segmentation.nii.gz",
+            "id": "promise12_training_data_03"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case30.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case30_segmentation.nii.gz",
+            "id": "promise12_training_data_30"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case08.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case08_segmentation.nii.gz",
+            "id": "promise12_test_data_08"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case08.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case08_segmentation.nii.gz",
+            "id": "promise12_training_data_08"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case12.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case12_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_12"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case06.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case06_segmentation.nii.gz",
+            "id": "promise12_training_data_06"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case49.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case49_segmentation.nii.gz",
+            "id": "promise12_training_data_49"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case08.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case08_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_08"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case25.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case25_segmentation.nii.gz",
+            "id": "promise12_test_data_25"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case16.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case16_segmentation.nii.gz",
+            "id": "promise12_test_data_16"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case13.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case13_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_13"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case28.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case28_segmentation.nii.gz",
+            "id": "promise12_training_data_28"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case40.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case40_segmentation.nii.gz",
+            "id": "promise12_training_data_40"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case11.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case11_segmentation.nii.gz",
+            "id": "promise12_test_data_11"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case39.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case39_segmentation.nii.gz",
+            "id": "promise12_training_data_39"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case18.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case18_segmentation.nii.gz",
+            "id": "promise12_test_data_18"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case37.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case37_segmentation.nii.gz",
+            "id": "promise12_training_data_37"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case13.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case13_segmentation.nii.gz",
+            "id": "promise12_test_data_13"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case07.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case07_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_07"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case27.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case27_segmentation.nii.gz",
+            "id": "promise12_test_data_27"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case11.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case11_segmentation.nii.gz",
+            "id": "promise12_training_data_11"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case45.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case45_segmentation.nii.gz",
+            "id": "promise12_training_data_45"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case10.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case10_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_10"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case29.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case29_segmentation.nii.gz",
+            "id": "promise12_test_data_29"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case05.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case05_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_05"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case07.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case07_segmentation.nii.gz",
+            "id": "promise12_test_data_07"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case42.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case42_segmentation.nii.gz",
+            "id": "promise12_training_data_42"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case01.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case01_segmentation.nii.gz",
+            "id": "promise12_training_data_01"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case22.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case22_segmentation.nii.gz",
+            "id": "promise12_test_data_22"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case34.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case34_segmentation.nii.gz",
+            "id": "promise12_training_data_34"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case02.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case02_segmentation.nii.gz",
+            "id": "promise12_training_data_02"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case36.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case36_segmentation.nii.gz",
+            "id": "promise12_training_data_36"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case33.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case33_segmentation.nii.gz",
+            "id": "promise12_training_data_33"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case00.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case00_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_00"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case11.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case11_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_11"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case27.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case27_segmentation.nii.gz",
+            "id": "promise12_training_data_27"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case21.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/test_data_nii/Case21_segmentation.nii.gz",
+            "id": "promise12_test_data_21"
+        }
+    ],
+    "testing": [
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/020/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/020/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_20"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/021/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/021/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_21"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/022/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/022/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_22"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/023/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/023/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_23"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/038/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/038/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_38"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/041/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/041/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_41"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/046/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/046/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_46"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/047/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/047/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_47"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/051/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/051/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_51"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/056/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/056/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_56"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/060/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/060/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_60"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/061/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/061/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_61"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/077/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/077/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_77"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/084/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/084/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_84"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/087/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/087/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_87"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/099/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/099/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_99"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/109/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/109/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_109"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/114/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/114/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_114"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/118/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/118/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_118"
+        },
+        {
+            "image": "zenodo/prostate158/record-6481141/prostate158_train/train/127/t2.nii.gz",
+            "label": "zenodo/prostate158/record-6481141/prostate158_train/train/127/t2_wholegland_reader1.nii.gz",
+            "id": "prostate158_127"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00010_19950706_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00010_19950706_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00010_19950706"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00010_19950709_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00010_19950709_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00010_19950709"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00012_19951215_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00012_19951215_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00012_19951215"
+        },
+        {
+            "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00012_19951223_t2_weighted_axial.nii.gz",
+            "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00012_19951223_t2_weighted_axial_wholegland.nii.gz",
+            "id": "qin_PCAMPMRI-00012_19951223"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0076__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0076.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0076"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0052__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0052.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0052"
+        },
+        {
+            "image": "tcia/prostate_diagnosis/images_nii/ProstateDx-01-0071__0.nii.gz",
+            "label": "tcia/prostate_diagnosis/labels_nii/isbi_wg/ProstateDx-01-0071.nii.gz",
+            "id": "prostate_diagnosis_ProstateDx-01-0071"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case04.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case04_segmentation.nii.gz",
+            "id": "promise12_training_data_04"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_03"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case10.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case10_segmentation.nii.gz",
+            "id": "promise12_training_data_10"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case00.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case00_segmentation.nii.gz",
+            "id": "promise12_training_data_00"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case48.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case48_segmentation.nii.gz",
+            "id": "promise12_training_data_48"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_01"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case41.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case41_segmentation.nii.gz",
+            "id": "promise12_training_data_41"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case12.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case12_segmentation.nii.gz",
+            "id": "promise12_training_data_12"
+        }
+    ]
+}

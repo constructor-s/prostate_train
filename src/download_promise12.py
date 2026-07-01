@@ -189,6 +189,68 @@ def generate_csvs(SPLITS = ("training_data", "test_data", "livechallenge_test_da
         print(f"Wrote {len(rows)} cases to {out_csv}")
 
 
+def generate_pooled_site_csvs(SPLITS = ("training_data", "test_data", "livechallenge_test_data")) -> None:
+    """Pool cases into RUNMC / non-RUNMC CSVs based on NIfTI header geometry.
+
+    RUNMC cases are identified via a geometric heuristic (spacing_z >= 3.6mm,
+    excluding a specific 320x320x24 protocol, excluding zeroed origins) rather
+    than a verified per-case institution label - see notebooks/explore_promise12_csv_metadata.ipynb.
+    Must be called after generate_csvs().
+    """
+    import csv
+
+    import SimpleITK as sitk
+
+    dataset_dir = dataset_root(Path("data"), DEFAULT_RECORD_ID) / DEFAULT_FOLDER
+
+    rows = []
+    for split in SPLITS:
+        csv_path = dataset_dir / f"{split}.csv"
+        if not csv_path.is_file():
+            print(f"Skipping {split}: CSV not found at {csv_path}")
+            continue
+
+        with csv_path.open(newline="") as fh:
+            for row in csv.DictReader(fh):
+                img = sitk.ReadImage(str(dataset_dir / row["t2"]))
+                dim_x, dim_y, dim_z = img.GetSize()
+                spacing_z = round(img.GetSpacing()[2], 4)
+                origin_x, origin_y, origin_z = (round(v, 2) for v in img.GetOrigin())
+                rows.append({
+                    "id": f"{split}_{int(row['ID']):02d}",
+                    "t2": row["t2"],
+                    "segmentation": row["segmentation"],
+                    "dim_x": dim_x,
+                    "dim_y": dim_y,
+                    "dim_z": dim_z,
+                    "spacing_z": spacing_z,
+                    "origin_x": origin_x,
+                    "origin_y": origin_y,
+                    "origin_z": origin_z,
+                })
+
+    def is_runmc(row: dict) -> bool:
+        return (
+            row["spacing_z"] >= 3.6
+            and not (row["dim_x"] == 320 and row["dim_y"] == 320 and row["dim_z"] == 24)
+            and not (row["origin_x"] == 0 and row["origin_y"] == 0 and row["origin_z"] == 0)
+        )
+
+    fieldnames = ["ID", "t2", "segmentation"]
+    for name, selected in (
+        ("pooled_runmc", [r for r in rows if is_runmc(r)]),
+        ("pooled_nonrunmc", [r for r in rows if not is_runmc(r)]),
+    ):
+        out_csv = dataset_dir / f"{name}.csv"
+        with out_csv.open("w", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(
+                {"ID": r["id"], "t2": r["t2"], "segmentation": r["segmentation"]} for r in selected
+            )
+        print(f"Wrote {len(selected)} cases to {out_csv}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

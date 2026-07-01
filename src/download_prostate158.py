@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import tempfile
 import subprocess
 import zipfile
 import sys
 from pathlib import Path
+
+import nibabel as nib
+import numpy as np
 
 DEFAULT_RECORD_ID = 6481141
 DEFAULT_FOLDER = "prostate158_train"
@@ -95,6 +99,53 @@ def download_prostate158(data_root: Path, record_id: int = DEFAULT_RECORD_ID, pr
         raise RuntimeError(f"Download completed but dataset was not marked complete at {dataset_dir}.")
 
     return dataset_dir
+
+
+def _update_csv_with_wholegland(csv_path: Path) -> None:
+    rows = csv_path.read_text(encoding="utf-8").splitlines()
+    reader = csv.DictReader(rows)
+    fieldnames = list(reader.fieldnames)
+    insert_idx = fieldnames.index("t2_anatomy_reader1") + 1
+    new_fieldnames = fieldnames[:insert_idx] + ["t2_wholegland_reader1"] + fieldnames[insert_idx:]
+
+    updated = []
+    for row in reader:
+        subject_id = row["ID"]
+        row["t2_wholegland_reader1"] = f"train/{int(subject_id):03d}/t2_wholegland_reader1.nii.gz"
+        updated.append(row)
+
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=new_fieldnames)
+        writer.writeheader()
+        writer.writerows(updated)
+
+
+def generate_wholegland_labels(dataset_dir: Path, overwrite: bool = False) -> None:
+    """Generate whole-gland binary masks from t2_anatomy_reader1 (labels > 0 → 1).
+
+    Also inserts a t2_wholegland_reader1 column into train.csv and valid.csv.
+
+    There is no t2_anatomy_reader2 in the Prostate158 dataset.
+    """
+    dataset_dir = Path(dataset_dir)
+    train_dir = dataset_dir / "train"
+    for subject_dir in sorted(train_dir.iterdir()):
+        if not subject_dir.is_dir():
+            continue
+        anatomy_path = subject_dir / "t2_anatomy_reader1.nii.gz"
+        out_path = subject_dir / "t2_wholegland_reader1.nii.gz"
+        if out_path.exists() and not overwrite:
+            continue
+        img = nib.load(anatomy_path)
+        mask = (np.asarray(img.dataobj) > 0).astype(np.uint8)
+        nib.save(nib.Nifti1Image(mask, img.affine, img.header), out_path)
+
+    for csv_name in ("train.csv", "valid.csv"):
+        csv_path = dataset_dir / csv_name
+        with csv_path.open(encoding="utf-8") as f:
+            header = f.readline()
+        if "t2_wholegland_reader1" not in header:
+            _update_csv_with_wholegland(csv_path)
 
 
 def parse_args() -> argparse.Namespace:

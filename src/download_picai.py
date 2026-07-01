@@ -12,6 +12,10 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import nibabel as nib
+import numpy as np
+from sklearn.model_selection import train_test_split
+
 DEFAULT_RECORD_ID = 6624726
 SOURCE_NAME = "zenodo"
 DATASET_NAME = "picai"
@@ -176,6 +180,65 @@ def build_picai_infer_csv(
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+_ZONAL_SOURCES = {"HeviAI23": "zonal_pz_tz/AI/HeviAI23", "Yuan23": "zonal_pz_tz/AI/Yuan23"}
+_ALL_SOURCES = ["Bosma22b", "Guerbet23", "HeviAI23", "Yuan23"]
+
+
+def _convert_zonal_labels(delineations_root: Path) -> None:
+    """Binarize zonal (PZ+TZ) labels into whole-gland labels; skip existing files."""
+    for source, rel in _ZONAL_SOURCES.items():
+        src_dir = delineations_root / rel
+        dst_dir = delineations_root / "whole_gland" / "AI" / source
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for src_file in sorted(src_dir.glob("*.nii.gz")):
+            dst_file = dst_dir / src_file.name
+            if dst_file.exists():
+                continue
+            img = nib.load(src_file)
+            data = np.asarray(img.dataobj)
+            binarized = nib.Nifti1Image((data > 0).astype(np.uint8), img.affine, img.header)
+            nib.save(binarized, dst_file)
+    print("Zonal label conversion complete.")
+
+
+def generate_picai_folds(
+    data_root: Path,
+    csv_path: Path,
+    output_json: Path,
+    seed: int = 42,
+    test_fraction: float = 0.2,
+) -> None:
+    """Generate configs/picai_folds.json from images_nii.csv.
+
+    Randomly assigns one of 4 silver-standard raters per case, converts zonal
+    labels to whole-gland binarizations first, then writes an 80/20 train/test
+    JSON split compatible with picai_input.yaml.
+    """
+    data_root = Path(data_root)
+    delineations_root = data_root / "picai_labels" / "anatomical_delineations"
+
+    _convert_zonal_labels(delineations_root)
+
+    df_rows = list(csv.DictReader(open(csv_path)))
+    rng = np.random.default_rng(seed)
+    chosen_sources = rng.choice(_ALL_SOURCES, size=len(df_rows))
+
+    record_prefix = csv_path.parent.name  # "record-6624726"
+    entries = []
+    for row, source in zip(df_rows, chosen_sources):
+        case_id = row["ID"]
+        entries.append({
+            "image": f"{record_prefix}/{row['t2']}",
+            "label": f"picai_labels/anatomical_delineations/whole_gland/AI/{source}/{case_id}.nii.gz",
+            "id": f"picai_{case_id}",
+        })
+
+    training, testing = train_test_split(entries, test_size=test_fraction, random_state=seed)
+    output_json = Path(output_json)
+    output_json.write_text(json.dumps({"training": training, "testing": testing}, indent=4))
+    print(f"Wrote {len(training)} training and {len(testing)} testing entries to {output_json}")
 
 
 def parse_args() -> argparse.Namespace:

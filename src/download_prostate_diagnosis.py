@@ -89,8 +89,6 @@ def _download_images(dataset_dir: Path, tmp_dir: Path, progress: bool) -> None:
     from tcia_utils import nbia
 
     dest_dir = dataset_dir / "images"
-    if dest_dir.is_dir() and any(dest_dir.iterdir()):
-        return
     dest_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = tmp_dir / "images.tcia"
     if progress:

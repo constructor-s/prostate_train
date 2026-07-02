@@ -1,9 +1,13 @@
 """5-fold ensemble inference using nnUNetPredictor.
 
 Usage:
-    python scripts/infer.py --bundle_root <path> --input <folder|file|csv> --output_folder <path>
+    python scripts/infer.py --bundle_root <path> --input <folder|file|csv|json> --output_folder <path>
 
 CSV input must have a 't2' column with paths relative to the CSV file's directory.
+
+JSON input must be a fold-split file with "training"/"testing" keys (e.g.
+configs/pooled2_folds.json), each a list of {"image", "label", "id"} entries
+with paths relative to --data_root. Use --split to choose which section to run.
 """
 import os
 # Set dummy nnUNet environment variable to suppress warnings about missing environment variables. 
@@ -13,6 +17,7 @@ os.environ["nnUNet_results"] = os.devnull
 
 import argparse
 import csv
+import json
 import pathlib
 import tempfile
 
@@ -54,8 +59,12 @@ def main() -> None:
     )
 
     parser.add_argument("--bundle_root", default=None, help="Path to the bundle directory (contains models/); defaults to the grandparent of this script")
-    parser.add_argument("--input", required=True, help="Folder of *_0000.nii.gz files, a single file, or a CSV with a 't2' column")
+    parser.add_argument("--input", required=True, help="Folder of *_0000.nii.gz files, a single file, a CSV with a 't2' column, or a fold-split JSON with 'training'/'testing' keys")
     parser.add_argument("--output_folder", required=True, help="Folder where predictions will be written")
+    parser.add_argument("--split", choices=["training", "testing"], default=None,
+                        help="Which section of a fold-split JSON to run; required when --input is a .json file")
+    parser.add_argument("--data_root", default="data/raw",
+                        help="Root directory that 'image' paths in a fold-split JSON are relative to")
 
     # nnUNetPredictor constructor — names match the underlying API exactly
     parser.add_argument("--tile_step_size", type=float, default=0.5,
@@ -78,14 +87,34 @@ def main() -> None:
                         help="Re-run prediction even if output file already exists")
     parser.add_argument("--num_processes_preprocessing", type=int, default=1,
                         help="Worker processes for image preprocessing")
-    parser.add_argument("--num_processes_segmentation_export", type=int, default=1,
+    parser.add_argument("--num_processes_segmentation_export", type=int, default=8,
                         help="Worker processes for writing output segmentation files")
 
     args = parser.parse_args()
 
     input_path = pathlib.Path(args.input)
+    if args.split is not None and input_path.suffix != ".json":
+        parser.error("--split is only valid when --input is a fold-split JSON file")
+
     _tmp_dir_ctx = None
-    if input_path.suffix == ".csv":
+    if input_path.suffix == ".json":
+        if args.split is None:
+            parser.error("--split is required when --input is a fold-split JSON file")
+        data_root = pathlib.Path(args.data_root)
+        with open(input_path) as f:
+            fold_data = json.load(f)
+        if args.split not in fold_data:
+            raise KeyError(f"'{args.split}' not found in {input_path}; available: {list(fold_data)}")
+        rows = fold_data[args.split]
+        _tmp_dir_ctx = tempfile.TemporaryDirectory()
+        tmp_dir = _tmp_dir_ctx.name
+        for row in tqdm(rows, desc="Converting images to NIfTI", delay=5):
+            src = str(data_root / row["image"])
+            dst = os.path.join(tmp_dir, f"{row['id']}_0000.nii.gz")
+            _save_as_nifti(src, dst)
+        list_of_lists_or_source_folder = tmp_dir
+        print(f"Converted {len(rows)} images ({args.split}) to NIfTI in temporary folder {tmp_dir}")
+    elif input_path.suffix == ".csv":
         data_root = input_path.parent
         with open(input_path) as f:
             rows = list(csv.DictReader(f))

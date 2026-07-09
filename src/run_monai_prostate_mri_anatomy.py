@@ -14,6 +14,9 @@ Run inference on the training split:
 
 Override the bundle or output directory:
     python run_anatomy_inference.py infer --bundle_dir /my/bundle --output_dir /my/results
+
+Run inference on the ProstateX dataset:
+    python src/run_monai_prostate_mri_anatomy.py infer --dataset_dir="data/raw/github/prostatex_masks" --split="index" --output_dir="results/prostatex_pred_monai_prostate"
 """
 
 import shutil
@@ -73,7 +76,9 @@ def infer(
         sys.exit(f"{src_csv} not found")
 
     test_csv = dataset_dir / "test.csv"
-    shutil.copy(src_csv, test_csv)
+    created_temp = src_csv != test_csv
+    if created_temp:
+        shutil.copy2(src_csv, test_csv)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -90,7 +95,8 @@ def infer(
             **{"postprocessing#transforms#3#data_root_dir": str(dataset_dir)},
         )
     finally:
-        test_csv.unlink(missing_ok=True)
+        if created_temp:
+            test_csv.unlink(missing_ok=True)
     print("Done.")
 
 

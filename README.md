@@ -26,6 +26,15 @@ python src/generate_cases.py \
 python -m monai.apps.nnunet nnUNetV2Runner convert_dataset --input_config=configs/promise12_input.yaml --work_dir=data/raw/zenodo/promise12/record-8026660/promise12/training_data_work_dir
 ``` -->
 
+## Pooled Dataset
+
+The following data are not from Radboud UMC, and are pooled together for training:
+
+- Prostate158 - 139 cases, 120 train (data/raw/zenodo/prostate158/record-6481141/prostate158_train/train.csv), 19 validation (data/raw/zenodo/prostate158/record-6481141/prostate158_train/valid.csv)
+- QIN - 15 cases each repeated twice (data/raw/tcia/qin_prostate_repeatability/index.csv), split 10% about 2 cases for validation (stratified same 2 subjects' 4 scans)
+- PROSTATE-DIAGNOSIS - 30 cases with segmentations (data/raw/tcia/prostate_diagnosis/index.csv), split 10% about 3 cases for validation
+- PROMISE12 - only use the 75 non-runmc cases in (data/raw/zenodo/promise12/record-8026660/promise12/pooled_nonrunmc.csv), split 10% about 8 cases for validation
+
 ## Preprocess
 
 ```bash
@@ -104,7 +113,7 @@ python src/generate_bundle.py \
 python bundles/Dataset158_prostate158_train_3d_fullres_5fold/scripts/infer.py \
     --input data/raw/zenodo/promise12/record-8026660/promise12/training_data.csv \
     --output_folder results/Dataset158_prostate158_train_3d_fullres_5fold/promise12/training_data/ \
-    --no-use_mirroring
+    --no-use_mirroring --tile_step_size=0.8
 ```
 
 Or nnUNetV2 format bundle:

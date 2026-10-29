@@ -221,7 +221,9 @@ __marimo__/
 # Downloaded datasets are stored locally but not tracked in version control.
 # They are reproducible via the download script.
 data/
+data_internal/
 uv.lock
 work_dir*/
 bundles/
 results/
+.vscode/

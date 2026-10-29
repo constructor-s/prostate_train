@@ -1,105 +1,46 @@
-# Manuscript Outline
+# Repository Guidance
 
-## Introduction
-- One application of prostate segmentation is automated volume prediction.
-- Useful in PI-RADS in calculation of prostate density.
-- Manual measurement is limited to ellipsoid formula, which is an “indirect” measure of volume.
-- Existing machine learning literature focus on reporting DSC, but not physically meaningful volume.
-- nnUNetv2, with correct preprocessing, augmentation, hyperparameters, and postprocessing, has been shown to achieve SOTA performance. (Cite nnUNetv2 revisited paper).
+This repository supports prostate imaging dataset downloading and management, model training, inference, and scientific analysis. See [README.md](README.md) for setup and training commands and `pyproject.toml` / `uv.lock` for dependencies.
 
+## Repository Layout
 
+| Location | Purpose |
+|----------|---------|
+| `src/` | Dataset download and management tools, training and evaluation code, and shared utilities |
+| `configs/` | Dataset splits and training configurations |
+| `bundle_template/` | Template for exported model bundles |
+| `bundles/` | Exported models and bundle-specific inference scripts |
+| `data/` | Downloaded datasets and metadata |
+| `data_internal/` | Internal datasets |
+| `work_dir*` | Training, preprocessing, and intermediate model artifacts |
+| `notebooks/` | Active scientific analyses using Python cell notebooks |
+| `notebooks_legacy/` | Historical exploratory analyses retained for reference |
+| `results/` | Generated predictions, tables, figures, and analysis outputs |
+| `tests/` | Automated checks |
 
-## Methods
-- Open source data/models based on only T2-weighted image for practicality:
-1. Derived from Prostate158 open weights MONAI model (“Prostate158-Adams22”) https://project-monai.github.io/model-zoo.html#/model/prostate_mri_anatomy 
-2. Derived from Prostate158, trained 3D nnUNetv2 (“Prostate158-nnUNet”)
-3. Derived from PROMISE12, trained 3D nnUNetv2 (“PROMISE12-nnUNet”)
-- These models were used to predict the segmentation in the PI-CAI dataset.
+## Scientific Notebooks
 
-- Closed source “silver standard” segmentation on PI-CAI dataset (Bosma22b, Guerbet23, HeviAI23, Yuan23)
-- PI-CAI clinical information, containing prostate_volume, PSA
+- Create new analyses in `notebooks/` as `.py` files with `# %%` code cells and `# %% [markdown]` explanatory cells. Use descriptive `snake_case` filenames; add numeric prefixes only when there is an intended workflow order.
+- Write in the style of a scientific notebook: introduce the question and inputs, explain methods, show calculations and intermediate results, and present plots and interpretations in a readable sequence.
+- Prioritize replication, readability, and self-contained analyses over code reuse. Direct cell-level code is preferred. Duplicated code across notebooks is acceptable; repetition alone does not justify extracting helpers.
+- Extract helpers only when they provide a substantial, concrete benefit. Place genuinely shared utilities in `src/`. Avoid unnecessary functions, classes, CLI entrypoints, configuration layers, and script boilerplate in notebooks.
+- Resolve paths from an explicitly established repository root rather than assuming the current working directory. Keep generated outputs in a descriptive subdirectory of `results/`.
+- Make inputs, cohort selection, exclusions, units, parameters, and any random seeds clear enough to replicate the analysis. Keep the analysis executable in cell order.
+- Leave legacy analyses untouched unless a task specifically requires changing them.
 
-## Results:
-- Inter-rater variability matrix
+## Inference and Evaluation
 
-- x axis=average of silver standard volumes, y axis=deviation of each method from the average
+- Use the relevant exported bundle's `scripts/infer.py` entrypoint under `bundles/`. Check that bundle's configuration for ensemble folds and inference settings.
+- Verify label mappings in the model's `models/dataset.json`. Some models use label 1 for transition zone (TZ) and label 2 for peripheral zone (PZ), with whole gland defined as their union. Other models use label 1 for whole gland.
+- Distinguish zone-specific measurements from whole-gland measurements. Record metrics per case and evaluated label or region.
+- State volume units explicitly. Voxel count multiplied by voxel volume gives mm³; divide by 1,000 to obtain mL. Match spacing order to array axes and ensure masks share the same spatial geometry before comparison.
+- See `src/seg_metrics.py` for existing segmentation metric definitions: DSC, IoU, precision, recall, specificity, confusion volumes, predicted/reference volumes, HD95, and ASSD. Surface distances use millimetres and account for voxel spacing.
+- The existing `vol_sim` key is relative absolute volume error, `abs(pred_vol - gt_vol) / gt_vol`, despite its name. Lower is better; it is NaN when reference volume is zero.
+- If reporting inference time, state how it was measured; file modification times provide an estimate rather than a direct runtime measurement.
 
+## Development and Validation
 
-
-
-
-- Confusion matrix for prostate volume and PSAD and PSAD ROC between manual and average of silver standard
-
-
-- Confusion matrix for prostate volume and PSAD and PSAD ROC between “PROMISE12-3DnnUNet” and average of silver standard
-
-
-- Confusion matrix for prostate volume and PSAD and PSAD ROC between “Prostate158-3DnnUNet” and average of silver standard
-
-
-
-
-
-## Discussion
-- Inter-rater variability in manual ellipsoid from previous studies is higher than inter-rater variability of deep learning algorithms.
-- Therefore, deep learning algorithms provide a more reproducible measurement
-
-# Coding Conventions
-
-## Evaluation
-
-Some models segment two prostate zones:
-
-**Labels** (from `bundles/prostate158_2d_5fold/models/dataset.json`):
-- Label 1 = transition zone (TZ)
-- Label 2 = peripheral zone (PZ)
-- Whole gland = union of labels 1 and 2
-
-Some models only segment the whole gland (label 1).
-
-**Inference**: 5-fold ensemble via `scripts/infer.py`.
-
-**Metrics** computed per case × label (volumes in mm³):
-| Metric | Description |
-|--------|-------------|
-| TP / FP / FN / TN vol | Voxel-count × voxel volume |
-| DSC | Dice Similarity Coefficient |
-| IoU | Jaccard index |
-| Precision / Recall / Specificity | Standard binary classification metrics |
-| Volume similarity | `|pred_vol − gt_vol| / gt_vol` |
-| HD95 | 95th-percentile Hausdorff Distance (mm) |
-| ASSD | Average Symmetric Surface Distance (mm) |
-| inference_sec | Per-case wall time (estimated from output file mtimes) |
-
-## Repository Structure
-
-```
-prostate_train/
-├── .venv/                      # Virtual environment (not tracked)
-├── bundles/                    # Trained model bundles (see "Bundle Formats")
-│   ├── prostate158_2d_5fold/           # MONAI-style bundle (2D)
-│   ├── prostate158_3d_fullres_5fold/   # MONAI-style bundle (3D)
-│   ├── Dataset158_...__2d.zip          # nnUNet native output (2D)
-│   └── Dataset158_...__3d_fullres.zip  # nnUNet native output (3D)
-├── configs/
-│   ├── prostate158_folds.json  # Train/test split (119 train, 20 test)
-│   └── prostate158_input.yaml  # MONAI nnUNetV2Runner input config
-├── data/                       # Downloaded datasets (not tracked)
-│   ├── raw/                    # Persistent extracted data
-│   └── tmp/                    # Temporary archives (auto-cleaned)
-├── notebooks/
-│   └── evaluate_2d.ipynb       # End-to-end evaluation notebook
-├── src/
-│   └── download_prostate158.py     # Main downloader script
-├── tests/
-│   └── test_download_prostate158.py
-├── pyproject.toml              # Project metadata & deps
-├── README.md                   # User-facing quick start
-├── LICENSE                     # (present)
-└── AGENTS.md                   # This file
-```
-
-## Reference:
-
-- [nnUNetV2Runner](.venv/lib/python3.12/site-packages/monai/apps/nnunet/nnunetv2_runner.py)
-- [mmUNetV2 console scripts](.venv/lib/python3.12/site-packages/nnunetv2-2.7.0.dist-info/entry_points.txt)
+- Use the existing project environment and dependency configuration. Consult `README.md` for established workflows.
+- Run checks relevant to changed behavior using the existing tests. For analysis changes, check cell execution order, input paths, and affected calculations or outputs as appropriate.
+- Distinguish lightweight validation from dataset downloads, preprocessing, model training, and full inference; report what was actually run.
+- Documentation-only changes require checking referenced paths and reviewing the diff, not training or inference runs.

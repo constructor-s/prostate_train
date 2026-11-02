@@ -144,3 +144,80 @@ of the target population. The selected linked cohort is not a random population
 sample; bootstrap resampling does not remove that limitation or capture training
 variability. These are volume-accuracy comparisons, not spatial segmentation
 metrics. Methodological background: [Ludbrook (1995), PubMed](https://pubmed.ncbi.nlm.nih.gov/7487733/).
+
+## PSA-density agreement and strata
+
+The same notebook continues with PSA density = PSA (ng/mL) / volume (mL), in
+**ng/mL²**. The reference is PSA divided by manual whole-gland mask volume.
+Each selected comparator uses that same PSA with its own volume measurement.
+The marksheet's reported `psad` is examined separately at the end.
+
+The density audit retains all 190 volume-analysis cases. Densities are calculated
+where PSA is finite and nonnegative and the denominator is finite and positive.
+Comparisons use one shared subset with positive PSA and valid volumes for the
+reference and all selected methods. Zero PSA is excluded from comparisons because
+log axes and relative errors require positive reference density. Missing PSA or
+invalid/empty-volume predictions are audited and excluded from every method in
+this density subset. The original volume analysis retains its cohort. Current
+default inputs yield **189 density cases**, with one missing PSA.
+
+The continuous summaries and agreement figures mirror the volume analysis:
+measured versus reference density, signed and relative differences, and unsmoothed
+count histograms. Density axes use log scales; difference rows show the full range.
+Paired absolute-error counts, RMSE inference, and closer-probability inference use
+the existing bootstrap settings, exact sign test, and Holm procedure. PSA-density
+endpoints form a separate multiplicity family from volume endpoints. Fields ending
+in `_psad` have units ng/mL²; `_psad2` denotes squared density units.
+
+Strata use unrounded values: **[0, 0.10), [0.10, 0.15), [0.15, 0.20), [0.20, ∞)**.
+Confusion-matrix rows are manual-mask reference strata and columns are comparator
+strata. Figures show counts and row percentages on a shared color scale. Summaries
+include accuracy, balanced accuracy, macro F1, quadratic-weighted kappa, and lower/
+equal/higher stratum counts. Per-stratum tables include precision, recall,
+specificity, F1, support, and confusion counts. Separate cutoff tables define
+positive as density ≥ 0.10, ≥ 0.15, or ≥ 0.20 and report sensitivity, specificity,
+PPV, NPV, accuracy, and TP/FP/FN/TN. Undefined ratios are NaN; macro averages use
+defined components. These measure density-stratum agreement, not cancer detection.
+
+New files under `results/prostatex_linked_volume/`:
+
+- `psa_density_cohort_audit.csv`, `psa_density_per_case.csv`, and `psa_density_summary.csv`.
+- `psa_density_agreement.png` / `.pdf` and `psa_density_confusion.png` / `.pdf`.
+- `psa_density_confusion.csv`, `psa_density_classification_summary.csv`,
+  `psa_density_per_stratum.csv`, and `psa_density_threshold_statistics.csv`.
+- `psa_density_pairwise_per_case.csv`, `psa_density_pairwise_counts.csv`, and
+  `psa_density_pairwise_statistics.csv`. Single-method runs write empty pairwise tables.
+
+## Reported marksheet PSA density
+
+The final cells compare reported `psad` against **PSA / clinical volume** and
+**PSA / manual-mask volume**. They also compare recalculated clinical density with
+manual-mask density on the same complete cases. This subset is independent of
+prediction-method selection; current inputs provide **181 complete reported-density
+cases**. The audit retains missing/invalid reports and exclusions. Nonnegative
+reported density is valid; a zero report has undefined implied volume and is
+omitted from log-density display, but remains in statistics and strata.
+
+Per-case residuals decompose total disagreement:
+
+`reported − manual-mask = (reported − recalculated clinical) + (recalculated clinical − manual-mask)`.
+
+The first term measures reporting inconsistency; the second measures the density
+difference from using clinical volume with the same PSA. An absolute reporting
+residual above **0.005 ng/mL²** is flagged for inspection. This configurable band
+assumes density alone was rounded to two decimal places; source precision varies,
+and rounded PSA/volume or different source measurements can also explain residuals.
+A flag is not confirmation of a reporting error.
+
+The final tables include signed and relative reporting residuals, volume implied
+by reported density, largest discrepancies, stratum agreement/changes, and the
+reporting-associated change in absolute manual-mask error (positive means a larger
+error; negative means a smaller error). Agreement figures
+compare all three measurement pairs; a residual histogram and component scatter
+show how reporting residuals add to clinical-volume disagreement. Exported confusion
+counts and heatmaps cover all three pairs on this same subset, using reference rows
+and estimated columns as above.
+
+Outputs use `psa_density_reported_` followed by `audit.csv`, `per_case.csv`,
+`summary.csv`, `confusion.csv`, or `diagnostics.csv`; figures use `agreement`,
+`components`, and `confusion`, each as PNG and PDF. All are in the same results directory.

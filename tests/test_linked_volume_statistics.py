@@ -15,7 +15,10 @@ import pandas as pd
 
 NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks/prostatex_linked_clinical_volume.py'
 SOURCE = NOTEBOOK.read_text()
-STATISTICS_SOURCE = SOURCE[SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):]
+STATISTICS_SOURCE = SOURCE[
+    SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):
+    SOURCE.index('# %% [markdown]\n# ## PSA density: calculations')
+]
 CORRECTION_SOURCE = STATISTICS_SOURCE[STATISTICS_SOURCE.index('pairwise_statistics = pd.DataFrame(statistics_rows)'):]
 
 

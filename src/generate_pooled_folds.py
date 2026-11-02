@@ -93,15 +93,72 @@ def generate_pooled2_folds():
     print(f"Wrote {len(training)} training and {len(testing)} testing entries to {out}")
 
 
+def generate_rumcnotprostatex_folds():
+    """Partition RUMC by linked PROSTATEx patient; use Bosma22b AI labels."""
+    labels = DATA / 'zenodo/picai/picai_labels'
+    index_path = DATA / 'zenodo/picai/record-6624726/images_nii.csv'
+    marksheet = pd.read_csv(labels / 'clinical_information/marksheet.csv')
+    cases = pd.read_csv(DATA / 'github/prostatex_masks/index.csv')
+    images = pd.read_csv(index_path)
+    mapping = json.loads((labels / 'additional_resources/ProstateX-mapping.json').read_text())
+    for frame, columns in [(marksheet, ['patient_id', 'study_id']), (cases, ['ID']), (images, ['ID'])]:
+        if frame[columns].isna().any().any() or frame.duplicated(columns).any():
+            raise ValueError(f'Missing or duplicate keys: {columns}')
+    links = pd.DataFrame([(key.split('_')[0], value) for key, value in mapping.items()],
+                         columns=['ID', 'picai_key'])
+    links = links.loc[~links['ID'].duplicated(keep=False)].copy()
+    links[['patient_id', 'study_id']] = links['picai_key'].str.split('_', expand=True).astype('int64')
+    cohort = cases.merge(links, on='ID', how='left', validate='one_to_one').merge(
+        marksheet, on=['patient_id', 'study_id'], how='left', validate='many_to_one', indicator=True)
+    volume = pd.to_numeric(cohort['prostate_volume'], errors='coerce')
+    linked = cohort.loc[cohort['_merge'].eq('both') & volume.gt(0) & volume.lt(float('inf'))]
+    if len(linked) != 190 or linked.duplicated(['patient_id', 'study_id']).any():
+        raise ValueError('Expected 190 unique linked studies; inspect cohort inputs')
+    rumc = marksheet.loc[marksheet['center'].eq('RUMC')].copy()
+    rumc['ID'] = rumc['patient_id'].astype(str) + '_' + rumc['study_id'].astype(str)
+    rumc = rumc.merge(images[['ID', 't2']], on='ID', how='left', validate='one_to_one')
+    if rumc['t2'].isna().any():
+        raise ValueError('RUMC studies missing from image index')
+    heldout = rumc['patient_id'].isin(linked['patient_id'])
+    splits = {'training': rumc.loc[~heldout], 'testing': rumc.loc[heldout]}
+    train, test = splits.values()
+    if set(train['ID']) & set(test['ID']) or set(train['patient_id']) & set(test['patient_id']):
+        raise ValueError('Study or patient overlap between splits')
+    if (len(rumc), len(train), train.patient_id.nunique(), len(test), test.patient_id.nunique()) != (800, 609, 602, 191, 190):
+        raise ValueError('RUMC split counts changed; inspect inputs before generating folds')
+    if not set(linked['picai_key']) <= set(test['ID']):
+        raise ValueError('Linked studies absent from testing')
+    folds = {}
+    for split, frame in splits.items():
+        entries = []
+        for row in frame.sort_values(['patient_id', 'study_id']).itertuples(index=False):
+            image = (index_path.parent / row.t2).resolve()
+            label = labels / 'anatomical_delineations/whole_gland/AI/Bosma22b' / f'{row.ID}.nii.gz'
+            for path in (image, label):
+                if not path.is_file():
+                    raise FileNotFoundError(path)
+            entries.append({'image': image.relative_to(DATA.resolve()).as_posix(),
+                            'label': label.relative_to(DATA).as_posix(), 'id': f'picai_{row.ID}'})
+        folds[split] = entries
+    out = ROOT / 'configs/rumcnotprostatex_folds.json'
+    out.write_text(json.dumps(folds, indent=4))
+    for split, frame in splits.items():
+        print(f'{split}: {len(frame)} studies / {frame.patient_id.nunique()} patients')
+    print(f'Wrote {out}; zero study and patient overlap')
+    return folds
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate pooled fold config JSON.")
-    parser.add_argument("--pooling", choices=["pooled", "pooled2"], required=True)
+    parser.add_argument("--pooling", choices=["pooled", "pooled2", "rumcnotprostatex"], required=True)
     args = parser.parse_args()
 
     if args.pooling == "pooled":
         generate_pooled_folds()
-    else:
+    elif args.pooling == "pooled2":
         generate_pooled2_folds()
+    else:
+        generate_rumcnotprostatex_folds()
 
 
 if __name__ == "__main__":

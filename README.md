@@ -123,3 +123,13 @@ nnUNet_results="work_dir/nnUNet_trained_models" nnUNetv2_export_model_to_zip \
   -d Dataset158_prostate158_train -tr nnUNetTrainer_100epochs -p nnUNetPlans -c 3d_fullres \
   -o bundles/Dataset158_prostate158_train_nnUNetTrainer_100epochs__nnUNetPlans__3d_fullres.zip
 ```
+
+### Standalone RUMC excluding linked PROSTATEx patients
+
+Run `python src/generate_pooled_folds.py --pooling rumcnotprostatex` to generate
+`configs/rumcnotprostatex_folds.json` (paths relative to `data/raw`). Training
+contains 609 RUMC studies from 602 patients; testing contains 190 linked PROSTATEx
+studies plus the additional examination `11383_1001407` (191 studies, 190 patients).
+Both splits use PI-CAI T2 images and Bosma22b AI whole-gland labels, including testing.
+Study and patient IDs are disjoint. The generator reconstructs the notebook's
+linked cohort from source metadata and validates counts and files before writing.

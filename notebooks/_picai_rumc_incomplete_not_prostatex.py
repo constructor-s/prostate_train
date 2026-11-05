@@ -1,19 +1,20 @@
 # %% [markdown]
-# # Generate clinically incomplete RUMC training data
+# # Clinically incomplete RUMC training and manual PROSTATEx testing
 #
 # Restrict the marksheet to RUMC, then require volume, PSA, recorded PSAD,
 # PI-RADS, and biopsy grade on the same row for a complete clinical exam.
 # Exclude patients with any complete RUMC exam and every PROSTATEx-mapped patient.
 # Select the earliest RUMC exam per remaining patient for training.
 #
-# Current inputs yield 236 training exams from 236 patients. The manifest's
-# `testing` list is deliberately empty. All training labels are Bosma22b AI
-# whole-gland annotations, which are automated surrogate annotations rather than
-# independent manual ground truth.
+# Keep the 236 training exams from 236 patients and add locally indexed, mapped
+# PROSTATEx cases to testing, pairing original T2 images with manual whole-gland
+# masks. Training labels remain Bosma22b AI surrogate annotations. Exclude every
+# PROSTATEx-mapped patient from training, including ambiguous links and repeats.
+# Exclude unmapped PROSTATEx identities from testing and record them in the audit.
 #
 # Run cells in order, or execute this file with the project Python environment.
 # Write the manifest under configs/ and selection audits under
-# results/picai_rumc_incomplete_not_prostatex/. Only selected training image/label
+# results/picai_rumc_incomplete_not_prostatex/. All selected training and testing
 # paths are checked. No downloads, image processing, preprocessing, training, or
 # inference are performed. Selection is deterministic; no random seed is needed.
 
@@ -39,16 +40,22 @@ MARKSHEET_PATH = LABEL_ROOT / 'clinical_information/marksheet.csv'
 MAPPING_PATH = LABEL_ROOT / 'additional_resources/ProstateX-mapping.json'
 IMAGE_INDEX_PATH = PICAI_ROOT / 'record-6624726/images_nii.csv'
 BOSMA_ROOT = LABEL_ROOT / 'anatomical_delineations/whole_gland/AI/Bosma22b'
+PROSTATEX_ROOT = DATA_ROOT / 'github/prostatex_masks'
+PROSTATEX_INDEX_PATH = PROSTATEX_ROOT / 'index.csv'
+MANUAL_ROOT = PROSTATEX_ROOT / 'Files/prostate'
 MANIFEST_PATH = REPO_ROOT / 'configs/picai_rumc_incomplete_not_prostatex_folds.json'
 OUTPUT_DIR = REPO_ROOT / 'results/picai_rumc_incomplete_not_prostatex'
 
-for path in (MARKSHEET_PATH, MAPPING_PATH, IMAGE_INDEX_PATH):
+for path in (MARKSHEET_PATH, MAPPING_PATH, IMAGE_INDEX_PATH, PROSTATEX_INDEX_PATH):
     if not path.is_file():
         raise FileNotFoundError(f'Required local input: {path}')
 marksheet = pd.read_csv(MARKSHEET_PATH)
 rumc = marksheet.loc[marksheet['center'].eq('RUMC')].copy()
 images = pd.read_csv(IMAGE_INDEX_PATH)
 mapping = json.loads(MAPPING_PATH.read_text())
+prostatex = pd.read_csv(PROSTATEX_INDEX_PATH)
+assert prostatex['ID'].notna().all() and prostatex['ID'].is_unique, 'Missing or duplicate PROSTATEx IDs'
+assert not prostatex.empty, 'No PROSTATEx testing cases'
 assert not rumc[['patient_id', 'study_id']].isna().any().any(), 'Missing RUMC marksheet keys'
 assert not rumc.duplicated(['patient_id', 'study_id']).any(), 'Duplicate RUMC marksheet keys'
 assert images['ID'].notna().all() and images['ID'].is_unique, 'Missing or duplicate image-index IDs'
@@ -140,7 +147,7 @@ audit['training_eligible_patient'] = ~audit['patient_has_complete_exam'] & ~audi
 #
 # Sort by MRI date, then original marksheet row order to resolve date ties.
 # Retain every RUMC exam and its selection reason in the audit. All unselected
-# exams are excluded from the manifest; testing stays empty.
+# RUMC exams are excluded from the manifest; testing uses PROSTATEx only.
 
 # %%
 first_exams = audit.sort_values(['patient_id', 'visit_date', 'marksheet_row']).drop_duplicates('patient_id')
@@ -162,6 +169,38 @@ assert training['is_first_exam'].all()
 assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_patient'], 'patient_id'])
 
 # %% [markdown]
+# ## Add manual PROSTATEx testing cases and check mapped identities
+#
+# Require a PI-CAI mapping for testing, without clinical completeness requirements.
+# Retain all links for ambiguous IDs when checking overlap, since
+# choosing one link could miss a shared training patient. Original PROSTATEx T2
+# images are paired with mask_prostate annotations, never PI-CAI AI labels.
+
+# %%
+testing = prostatex.sort_values('ID').copy()
+links = pd.DataFrame(
+    [(key.split('_')[0], value, int(value.split('_')[0])) for key, value in mapping.items()],
+    columns=['ID', 'picai_key', 'patient_id'],
+)
+testing_links = links.loc[links['ID'].isin(testing['ID'])].copy()
+assert not set(training['patient_id']) & set(testing_links['patient_id']), 'Mapped patient overlap'
+assert not set(training['ID']) & set(testing_links['picai_key']), 'Mapped examination overlap'
+linked_keys = testing_links.groupby('ID')['picai_key'].agg(lambda values: ','.join(sorted(set(values))))
+testing['picai_keys'] = testing['ID'].map(linked_keys).fillna('')
+testing['mapping_count'] = testing['ID'].map(testing_links.groupby('ID').size()).fillna(0).astype(int)
+testing['linkage_status'] = np.select(
+    [testing['mapping_count'].eq(0), testing['mapping_count'].gt(1)],
+    ['excluded_no_mapping', 'multiple_links_all_excluded_from_training'],
+    default='mapped_patient_excluded_from_training',
+)
+testing['assignment'] = np.where(testing['mapping_count'].gt(0), 'testing', 'excluded')
+testing_audit = testing.copy()
+testing = testing.loc[testing['assignment'].eq('testing')].copy()
+assert not testing.empty, 'No mapped PROSTATEx testing cases'
+assert testing['mapping_count'].gt(0).all(), 'Unmapped testing identity'
+display(testing_audit['linkage_status'].value_counts().rename_axis('status').to_frame('prostatex_cases'))
+
+# %% [markdown]
 # ## Review cohort flow
 #
 # Of 792 RUMC patients, 340 have no complete exam. Excluding the 104 mapped to
@@ -180,7 +219,8 @@ flow = pd.DataFrame([
         ('PROSTATEx-mapped patients with no complete exam (excluded)', mapped_incomplete),
         ('Eligible RUMC patients before first-exam selection', eligible),
         ('Training: earliest RUMC exam per eligible patient', training),
-        ('Testing: intentionally empty', audit.iloc[:0]),
+        ('Testing: original PROSTATEx images and manual whole-gland masks',
+         testing.rename(columns={'ID': 'patient_id'})),
     ]
 ])
 assert (len(audit), audit['patient_id'].nunique()) == (800, 792), 'RUMC cohort changed'
@@ -195,7 +235,7 @@ display(audit.groupby('selection_reason').agg(examinations=('ID', 'size'), patie
 #
 # Image-index paths are relative to the index directory, including `../`.
 # Resolve paths before making them relative to data/raw for the manifest.
-# Check only the 236 selected images and their Bosma22b whole-gland labels.
+# Check training images/Bosma22b labels and testing images/manual masks.
 # All selection and path checks must pass before writing any output.
 
 # %%
@@ -214,7 +254,31 @@ for row in training.sort_values(['patient_id', 'visit_date', 'marksheet_row']).i
         'label': label_path.relative_to(DATA_ROOT).as_posix(),
         'id': f'picai_{row.ID}',
     })
-folds = {'training': entries, 'testing': []}
+testing_entries = []
+for row in testing.itertuples(index=False):
+    assert isinstance(row.t2, str) and row.t2.strip(), 'Missing PROSTATEx T2 path'
+    assert isinstance(row.label_wg, str) and row.label_wg.strip(), 'Missing manual whole-gland mask'
+    image_path = (PROSTATEX_ROOT / row.t2).resolve()
+    label_path = (PROSTATEX_ROOT / row.label_wg).resolve()
+    assert image_path.is_relative_to((MANUAL_ROOT / 'Images').resolve()), 'Unexpected PROSTATEx image source'
+    assert label_path.is_relative_to((MANUAL_ROOT / 'mask_prostate').resolve()), 'Testing requires manual whole-gland masks'
+    for path in (image_path, label_path):
+        if not path.is_file():
+            raise FileNotFoundError(path)
+    testing_entries.append({
+        'image': image_path.relative_to(DATA_ROOT).as_posix(),
+        'label': label_path.relative_to(DATA_ROOT).as_posix(),
+        'id': row.ID,
+    })
+folds = {'training': entries, 'testing': testing_entries}
+for field in ('id', 'image', 'label'):
+    train_values = {entry[field] for entry in entries}
+    test_values = {entry[field] for entry in testing_entries}
+    assert len(train_values) == len(entries), f'Duplicate training {field}'
+    assert len(test_values) == len(testing_entries), f'Duplicate testing {field}'
+    assert train_values.isdisjoint(test_values), f'Training/testing {field} overlap'
+testing['image'] = [entry['image'] for entry in testing_entries]
+testing['label'] = [entry['label'] for entry in testing_entries]
 manifest_text = json.dumps(folds, indent=4, allow_nan=False) + '\n'
 
 MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -222,6 +286,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 MANIFEST_PATH.write_text(manifest_text)
 audit.sort_values('marksheet_row').to_csv(OUTPUT_DIR / 'selection_audit.csv', index=False)
 flow.to_csv(OUTPUT_DIR / 'cohort_flow.csv', index=False)
+testing_audit = testing_audit.merge(testing[['ID', 'image', 'label']], on='ID', how='left', validate='one_to_one')
+testing_audit.to_csv(OUTPUT_DIR / 'testing_audit.csv', index=False)
 print(f'Wrote {MANIFEST_PATH}')
-print(f'Wrote selection_audit.csv and cohort_flow.csv to {OUTPUT_DIR}')
-print(f'Training: {len(entries)} RUMC exams / {training.patient_id.nunique()} patients; testing: 0')
+print(f'Wrote selection_audit.csv, testing_audit.csv, and cohort_flow.csv to {OUTPUT_DIR}')
+print(f'Training: {len(entries)} RUMC exams / {training.patient_id.nunique()} patients; testing: {len(testing_entries)} manual PROSTATEx cases')
+print(f'PROSTATEx cases excluded without a PI-CAI mapping: {testing_audit.mapping_count.eq(0).sum()}')

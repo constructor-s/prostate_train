@@ -10,6 +10,10 @@ NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks/_picai_rumc_incomple
 SOURCE = NOTEBOOK.read_text()
 SELECTION_SOURCE = SOURCE[
     SOURCE.index('audit = rumc.copy()'):
+    SOURCE.index('# %% [markdown]\n# ## Add manual PROSTATEx testing')
+]
+TESTING_SOURCE = SOURCE[
+    SOURCE.index("testing = prostatex.sort_values('ID').copy()"):
     SOURCE.index('# %% [markdown]\n# ## Review cohort flow')
 ]
 
@@ -93,6 +97,26 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
         ])
         self.assertEqual(result['training'].study_id.tolist(), [900])
         self.assertEqual(result['audit'].assignment.tolist(), ['excluded', 'training', 'excluded'])
+
+    def test_testing_excludes_unmapped_cases_and_checks_all_ambiguous_links(self):
+        namespace = dict(
+            prostatex=pd.DataFrame({'ID': ['ProstateX-0002', 'ProstateX-0001']}),
+            mapping={'ProstateX-0001_a': '1_100', 'ProstateX-0001_b': '2_200'},
+            training=pd.DataFrame({'patient_id': [3], 'ID': ['3_300']}),
+            np=np, pd=pd, display=lambda *args: None,
+        )
+        exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
+        testing = namespace['testing']
+        self.assertEqual(testing.ID.tolist(), ['ProstateX-0001'])
+        self.assertEqual(testing.mapping_count.tolist(), [2])
+        self.assertEqual(testing.picai_keys.tolist(), ['1_100,2_200'])
+        audit = namespace['testing_audit']
+        self.assertEqual(audit.assignment.tolist(), ['testing', 'excluded'])
+        self.assertEqual(audit.linkage_status.iloc[1], 'excluded_no_mapping')
+        # A different examination of either ambiguous mapped patient must fail.
+        namespace['training'] = pd.DataFrame({'patient_id': [2], 'ID': ['2_999']})
+        with self.assertRaisesRegex(AssertionError, 'Mapped patient overlap'):
+            exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
 
 
 if __name__ == '__main__':

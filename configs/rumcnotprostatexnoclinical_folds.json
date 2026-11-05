@@ -1,0 +1,1191 @@
+{
+    "training": [
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10001/10001_1000001_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10001_1000001.nii.gz",
+            "id": "picai_10001_1000001"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10010/10010_1000010_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10010_1000010.nii.gz",
+            "id": "picai_10010_1000010"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10014/10014_1000014_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10014_1000014.nii.gz",
+            "id": "picai_10014_1000014"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10020/10020_1000020_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10020_1000020.nii.gz",
+            "id": "picai_10020_1000020"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10024/10024_1000024_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10024_1000024.nii.gz",
+            "id": "picai_10024_1000024"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10031/10031_1000031_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10031_1000031.nii.gz",
+            "id": "picai_10031_1000031"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10033/10033_1000033_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10033_1000033.nii.gz",
+            "id": "picai_10033_1000033"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10039/10039_1000039_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10039_1000039.nii.gz",
+            "id": "picai_10039_1000039"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10049/10049_1000049_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10049_1000049.nii.gz",
+            "id": "picai_10049_1000049"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10054/10054_1000054_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10054_1000054.nii.gz",
+            "id": "picai_10054_1000054"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10055/10055_1000055_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10055_1000055.nii.gz",
+            "id": "picai_10055_1000055"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10057/10057_1000057_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10057_1000057.nii.gz",
+            "id": "picai_10057_1000057"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10061/10061_1000061_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10061_1000061.nii.gz",
+            "id": "picai_10061_1000061"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10070/10070_1000070_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10070_1000070.nii.gz",
+            "id": "picai_10070_1000070"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10082/10082_1000082_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10082_1000082.nii.gz",
+            "id": "picai_10082_1000082"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10087/10087_1000087_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10087_1000087.nii.gz",
+            "id": "picai_10087_1000087"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10088/10088_1000088_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10088_1000088.nii.gz",
+            "id": "picai_10088_1000088"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10089/10089_1000089_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10089_1000089.nii.gz",
+            "id": "picai_10089_1000089"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10099/10099_1000099_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10099_1000099.nii.gz",
+            "id": "picai_10099_1000099"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10108/10108_1000108_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10108_1000108.nii.gz",
+            "id": "picai_10108_1000108"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10115/10115_1000115_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10115_1000115.nii.gz",
+            "id": "picai_10115_1000115"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10122/10122_1000122_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10122_1000122.nii.gz",
+            "id": "picai_10122_1000122"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10124/10124_1000124_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10124_1000124.nii.gz",
+            "id": "picai_10124_1000124"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10125/10125_1000125_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10125_1000125.nii.gz",
+            "id": "picai_10125_1000125"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10129/10129_1000129_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10129_1000129.nii.gz",
+            "id": "picai_10129_1000129"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10130/10130_1000131_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10130_1000131.nii.gz",
+            "id": "picai_10130_1000131"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10145/10145_1000147_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10145_1000147.nii.gz",
+            "id": "picai_10145_1000147"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10148/10148_1000150_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10148_1000150.nii.gz",
+            "id": "picai_10148_1000150"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10150/10150_1000152_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10150_1000152.nii.gz",
+            "id": "picai_10150_1000152"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10151/10151_1000153_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10151_1000153.nii.gz",
+            "id": "picai_10151_1000153"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10156/10156_1000159_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10156_1000159.nii.gz",
+            "id": "picai_10156_1000159"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10163/10163_1000166_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10163_1000166.nii.gz",
+            "id": "picai_10163_1000166"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10172/10172_1000175_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10172_1000175.nii.gz",
+            "id": "picai_10172_1000175"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10177/10177_1000180_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10177_1000180.nii.gz",
+            "id": "picai_10177_1000180"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10181/10181_1000184_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10181_1000184.nii.gz",
+            "id": "picai_10181_1000184"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10192/10192_1000195_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10192_1000195.nii.gz",
+            "id": "picai_10192_1000195"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10193/10193_1000196_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10193_1000196.nii.gz",
+            "id": "picai_10193_1000196"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10204/10204_1000208_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10204_1000208.nii.gz",
+            "id": "picai_10204_1000208"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10205/10205_1000209_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10205_1000209.nii.gz",
+            "id": "picai_10205_1000209"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10224/10224_1000228_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10224_1000228.nii.gz",
+            "id": "picai_10224_1000228"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10247/10247_1000251_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10247_1000251.nii.gz",
+            "id": "picai_10247_1000251"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10249/10249_1000253_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10249_1000253.nii.gz",
+            "id": "picai_10249_1000253"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10250/10250_1000254_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10250_1000254.nii.gz",
+            "id": "picai_10250_1000254"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10251/10251_1000255_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10251_1000255.nii.gz",
+            "id": "picai_10251_1000255"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10255/10255_1000259_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10255_1000259.nii.gz",
+            "id": "picai_10255_1000259"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10264/10264_1000268_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10264_1000268.nii.gz",
+            "id": "picai_10264_1000268"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10269/10269_1000273_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10269_1000273.nii.gz",
+            "id": "picai_10269_1000273"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10272/10272_1000276_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10272_1000276.nii.gz",
+            "id": "picai_10272_1000276"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10279/10279_1000284_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10279_1000284.nii.gz",
+            "id": "picai_10279_1000284"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10284/10284_1000290_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10284_1000290.nii.gz",
+            "id": "picai_10284_1000290"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10288/10288_1000294_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10288_1000294.nii.gz",
+            "id": "picai_10288_1000294"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10291/10291_1000297_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10291_1000297.nii.gz",
+            "id": "picai_10291_1000297"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10292/10292_1000298_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10292_1000298.nii.gz",
+            "id": "picai_10292_1000298"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10297/10297_1000303_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10297_1000303.nii.gz",
+            "id": "picai_10297_1000303"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10303/10303_1000309_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10303_1000309.nii.gz",
+            "id": "picai_10303_1000309"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10311/10311_1000317_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10311_1000317.nii.gz",
+            "id": "picai_10311_1000317"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10316/10316_1000322_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10316_1000322.nii.gz",
+            "id": "picai_10316_1000322"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10323/10323_1000329_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10323_1000329.nii.gz",
+            "id": "picai_10323_1000329"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10345/10345_1000351_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10345_1000351.nii.gz",
+            "id": "picai_10345_1000351"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10351/10351_1000357_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10351_1000357.nii.gz",
+            "id": "picai_10351_1000357"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10357/10357_1000363_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10357_1000363.nii.gz",
+            "id": "picai_10357_1000363"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10359/10359_1000365_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10359_1000365.nii.gz",
+            "id": "picai_10359_1000365"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10367/10367_1000373_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10367_1000373.nii.gz",
+            "id": "picai_10367_1000373"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10379/10379_1000385_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10379_1000385.nii.gz",
+            "id": "picai_10379_1000385"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10384/10384_1000390_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10384_1000390.nii.gz",
+            "id": "picai_10384_1000390"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10386/10386_1000392_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10386_1000392.nii.gz",
+            "id": "picai_10386_1000392"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10391/10391_1000397_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10391_1000397.nii.gz",
+            "id": "picai_10391_1000397"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10409/10409_1000416_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10409_1000416.nii.gz",
+            "id": "picai_10409_1000416"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10412/10412_1000419_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10412_1000419.nii.gz",
+            "id": "picai_10412_1000419"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10421/10421_1000429_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10421_1000429.nii.gz",
+            "id": "picai_10421_1000429"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10428/10428_1000436_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10428_1000436.nii.gz",
+            "id": "picai_10428_1000436"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10429/10429_1000437_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10429_1000437.nii.gz",
+            "id": "picai_10429_1000437"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10435/10435_1000443_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10435_1000443.nii.gz",
+            "id": "picai_10435_1000443"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10439/10439_1000447_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10439_1000447.nii.gz",
+            "id": "picai_10439_1000447"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10441/10441_1000449_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10441_1000449.nii.gz",
+            "id": "picai_10441_1000449"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10448/10448_1000456_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10448_1000456.nii.gz",
+            "id": "picai_10448_1000456"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10449/10449_1000457_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10449_1000457.nii.gz",
+            "id": "picai_10449_1000457"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10454/10454_1000462_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10454_1000462.nii.gz",
+            "id": "picai_10454_1000462"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10461/10461_1000469_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10461_1000469.nii.gz",
+            "id": "picai_10461_1000469"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10467/10467_1000475_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10467_1000475.nii.gz",
+            "id": "picai_10467_1000475"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10475/10475_1000483_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10475_1000483.nii.gz",
+            "id": "picai_10475_1000483"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10488/10488_1000496_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10488_1000496.nii.gz",
+            "id": "picai_10488_1000496"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10489/10489_1000497_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10489_1000497.nii.gz",
+            "id": "picai_10489_1000497"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10516/10516_1000526_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10516_1000526.nii.gz",
+            "id": "picai_10516_1000526"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10531/10531_1000541_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10531_1000541.nii.gz",
+            "id": "picai_10531_1000541"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10532/10532_1000542_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10532_1000542.nii.gz",
+            "id": "picai_10532_1000542"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10556/10556_1000568_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10556_1000568.nii.gz",
+            "id": "picai_10556_1000568"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10561/10561_1000573_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10561_1000573.nii.gz",
+            "id": "picai_10561_1000573"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10586/10586_1000600_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10586_1000600.nii.gz",
+            "id": "picai_10586_1000600"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10590/10590_1000604_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10590_1000604.nii.gz",
+            "id": "picai_10590_1000604"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10594/10594_1000608_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10594_1000608.nii.gz",
+            "id": "picai_10594_1000608"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10596/10596_1000610_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10596_1000610.nii.gz",
+            "id": "picai_10596_1000610"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10599/10599_1000613_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10599_1000613.nii.gz",
+            "id": "picai_10599_1000613"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10600/10600_1000614_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10600_1000614.nii.gz",
+            "id": "picai_10600_1000614"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10601/10601_1000615_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10601_1000615.nii.gz",
+            "id": "picai_10601_1000615"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10603/10603_1000617_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10603_1000617.nii.gz",
+            "id": "picai_10603_1000617"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10608/10608_1000622_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10608_1000622.nii.gz",
+            "id": "picai_10608_1000622"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10609/10609_1000623_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10609_1000623.nii.gz",
+            "id": "picai_10609_1000623"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10612/10612_1000626_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10612_1000626.nii.gz",
+            "id": "picai_10612_1000626"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10623/10623_1000637_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10623_1000637.nii.gz",
+            "id": "picai_10623_1000637"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10629/10629_1000643_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10629_1000643.nii.gz",
+            "id": "picai_10629_1000643"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10653/10653_1000669_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10653_1000669.nii.gz",
+            "id": "picai_10653_1000669"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10664/10664_1000680_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10664_1000680.nii.gz",
+            "id": "picai_10664_1000680"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10669/10669_1000685_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10669_1000685.nii.gz",
+            "id": "picai_10669_1000685"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10672/10672_1000688_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10672_1000688.nii.gz",
+            "id": "picai_10672_1000688"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10675/10675_1000691_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10675_1000691.nii.gz",
+            "id": "picai_10675_1000691"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10689/10689_1000705_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10689_1000705.nii.gz",
+            "id": "picai_10689_1000705"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10691/10691_1000707_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10691_1000707.nii.gz",
+            "id": "picai_10691_1000707"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10695/10695_1000711_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10695_1000711.nii.gz",
+            "id": "picai_10695_1000711"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10698/10698_1000714_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10698_1000714.nii.gz",
+            "id": "picai_10698_1000714"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10703/10703_1000719_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10703_1000719.nii.gz",
+            "id": "picai_10703_1000719"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10709/10709_1000725_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10709_1000725.nii.gz",
+            "id": "picai_10709_1000725"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10716/10716_1000732_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10716_1000732.nii.gz",
+            "id": "picai_10716_1000732"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10717/10717_1000733_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10717_1000733.nii.gz",
+            "id": "picai_10717_1000733"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10723/10723_1000739_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10723_1000739.nii.gz",
+            "id": "picai_10723_1000739"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10727/10727_1000743_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10727_1000743.nii.gz",
+            "id": "picai_10727_1000743"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10729/10729_1000745_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10729_1000745.nii.gz",
+            "id": "picai_10729_1000745"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10748/10748_1000764_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10748_1000764.nii.gz",
+            "id": "picai_10748_1000764"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10750/10750_1000766_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10750_1000766.nii.gz",
+            "id": "picai_10750_1000766"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10751/10751_1000767_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10751_1000767.nii.gz",
+            "id": "picai_10751_1000767"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10767/10767_1000783_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10767_1000783.nii.gz",
+            "id": "picai_10767_1000783"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10779/10779_1000795_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10779_1000795.nii.gz",
+            "id": "picai_10779_1000795"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10782/10782_1000798_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10782_1000798.nii.gz",
+            "id": "picai_10782_1000798"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10784/10784_1000800_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10784_1000800.nii.gz",
+            "id": "picai_10784_1000800"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10786/10786_1000802_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10786_1000802.nii.gz",
+            "id": "picai_10786_1000802"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10788/10788_1000804_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10788_1000804.nii.gz",
+            "id": "picai_10788_1000804"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10793/10793_1000809_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10793_1000809.nii.gz",
+            "id": "picai_10793_1000809"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10823/10823_1000839_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10823_1000839.nii.gz",
+            "id": "picai_10823_1000839"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10824/10824_1000840_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10824_1000840.nii.gz",
+            "id": "picai_10824_1000840"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10829/10829_1000845_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10829_1000845.nii.gz",
+            "id": "picai_10829_1000845"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10835/10835_1000851_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10835_1000851.nii.gz",
+            "id": "picai_10835_1000851"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10843/10843_1000859_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10843_1000859.nii.gz",
+            "id": "picai_10843_1000859"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10844/10844_1000860_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10844_1000860.nii.gz",
+            "id": "picai_10844_1000860"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10849/10849_1000865_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10849_1000865.nii.gz",
+            "id": "picai_10849_1000865"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10858/10858_1000874_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10858_1000874.nii.gz",
+            "id": "picai_10858_1000874"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10870/10870_1000886_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10870_1000886.nii.gz",
+            "id": "picai_10870_1000886"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10877/10877_1000893_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10877_1000893.nii.gz",
+            "id": "picai_10877_1000893"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10884/10884_1000900_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10884_1000900.nii.gz",
+            "id": "picai_10884_1000900"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10890/10890_1000906_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10890_1000906.nii.gz",
+            "id": "picai_10890_1000906"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10892/10892_1000908_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10892_1000908.nii.gz",
+            "id": "picai_10892_1000908"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10896/10896_1000912_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10896_1000912.nii.gz",
+            "id": "picai_10896_1000912"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10923/10923_1000940_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10923_1000940.nii.gz",
+            "id": "picai_10923_1000940"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10928/10928_1000945_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10928_1000945.nii.gz",
+            "id": "picai_10928_1000945"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10929/10929_1000946_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10929_1000946.nii.gz",
+            "id": "picai_10929_1000946"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10934/10934_1000951_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10934_1000951.nii.gz",
+            "id": "picai_10934_1000951"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10949/10949_1000968_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10949_1000968.nii.gz",
+            "id": "picai_10949_1000968"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10969/10969_1000988_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10969_1000988.nii.gz",
+            "id": "picai_10969_1000988"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10974/10974_1000993_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10974_1000993.nii.gz",
+            "id": "picai_10974_1000993"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10987/10987_1001006_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10987_1001006.nii.gz",
+            "id": "picai_10987_1001006"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10988/10988_1001007_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10988_1001007.nii.gz",
+            "id": "picai_10988_1001007"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10997/10997_1001016_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10997_1001016.nii.gz",
+            "id": "picai_10997_1001016"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11024/11024_1001044_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11024_1001044.nii.gz",
+            "id": "picai_11024_1001044"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11027/11027_1001047_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11027_1001047.nii.gz",
+            "id": "picai_11027_1001047"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11028/11028_1001048_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11028_1001048.nii.gz",
+            "id": "picai_11028_1001048"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11029/11029_1001049_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11029_1001049.nii.gz",
+            "id": "picai_11029_1001049"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11034/11034_1001054_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11034_1001054.nii.gz",
+            "id": "picai_11034_1001054"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11036/11036_1001056_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11036_1001056.nii.gz",
+            "id": "picai_11036_1001056"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11047/11047_1001067_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11047_1001067.nii.gz",
+            "id": "picai_11047_1001067"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11053/11053_1001073_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11053_1001073.nii.gz",
+            "id": "picai_11053_1001073"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11062/11062_1001084_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11062_1001084.nii.gz",
+            "id": "picai_11062_1001084"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11066/11066_1001088_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11066_1001088.nii.gz",
+            "id": "picai_11066_1001088"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11071/11071_1001093_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11071_1001093.nii.gz",
+            "id": "picai_11071_1001093"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11088/11088_1001111_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11088_1001111.nii.gz",
+            "id": "picai_11088_1001111"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11091/11091_1001114_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11091_1001114.nii.gz",
+            "id": "picai_11091_1001114"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11092/11092_1001115_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11092_1001115.nii.gz",
+            "id": "picai_11092_1001115"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11094/11094_1001117_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11094_1001117.nii.gz",
+            "id": "picai_11094_1001117"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11104/11104_1001127_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11104_1001127.nii.gz",
+            "id": "picai_11104_1001127"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11107/11107_1001130_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11107_1001130.nii.gz",
+            "id": "picai_11107_1001130"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11109/11109_1001132_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11109_1001132.nii.gz",
+            "id": "picai_11109_1001132"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11118/11118_1001141_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11118_1001141.nii.gz",
+            "id": "picai_11118_1001141"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11121/11121_1001144_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11121_1001144.nii.gz",
+            "id": "picai_11121_1001144"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11126/11126_1001149_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11126_1001149.nii.gz",
+            "id": "picai_11126_1001149"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11134/11134_1001157_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11134_1001157.nii.gz",
+            "id": "picai_11134_1001157"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11136/11136_1001159_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11136_1001159.nii.gz",
+            "id": "picai_11136_1001159"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11144/11144_1001167_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11144_1001167.nii.gz",
+            "id": "picai_11144_1001167"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11151/11151_1001174_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11151_1001174.nii.gz",
+            "id": "picai_11151_1001174"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11172/11172_1001195_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11172_1001195.nii.gz",
+            "id": "picai_11172_1001195"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11178/11178_1001201_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11178_1001201.nii.gz",
+            "id": "picai_11178_1001201"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11184/11184_1001207_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11184_1001207.nii.gz",
+            "id": "picai_11184_1001207"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11187/11187_1001210_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11187_1001210.nii.gz",
+            "id": "picai_11187_1001210"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11191/11191_1001214_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11191_1001214.nii.gz",
+            "id": "picai_11191_1001214"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11202/11202_1001225_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11202_1001225.nii.gz",
+            "id": "picai_11202_1001225"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11203/11203_1001226_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11203_1001226.nii.gz",
+            "id": "picai_11203_1001226"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11209/11209_1001232_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11209_1001232.nii.gz",
+            "id": "picai_11209_1001232"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11210/11210_1001233_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11210_1001233.nii.gz",
+            "id": "picai_11210_1001233"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11211/11211_1001234_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11211_1001234.nii.gz",
+            "id": "picai_11211_1001234"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11217/11217_1001240_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11217_1001240.nii.gz",
+            "id": "picai_11217_1001240"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11218/11218_1001241_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11218_1001241.nii.gz",
+            "id": "picai_11218_1001241"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11221/11221_1001244_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11221_1001244.nii.gz",
+            "id": "picai_11221_1001244"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11224/11224_1001247_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11224_1001247.nii.gz",
+            "id": "picai_11224_1001247"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11228/11228_1001251_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11228_1001251.nii.gz",
+            "id": "picai_11228_1001251"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11230/11230_1001253_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11230_1001253.nii.gz",
+            "id": "picai_11230_1001253"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11238/11238_1001261_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11238_1001261.nii.gz",
+            "id": "picai_11238_1001261"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11241/11241_1001264_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11241_1001264.nii.gz",
+            "id": "picai_11241_1001264"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11249/11249_1001272_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11249_1001272.nii.gz",
+            "id": "picai_11249_1001272"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11251/11251_1001274_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11251_1001274.nii.gz",
+            "id": "picai_11251_1001274"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11262/11262_1001285_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11262_1001285.nii.gz",
+            "id": "picai_11262_1001285"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11264/11264_1001287_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11264_1001287.nii.gz",
+            "id": "picai_11264_1001287"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11273/11273_1001296_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11273_1001296.nii.gz",
+            "id": "picai_11273_1001296"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11290/11290_1001313_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11290_1001313.nii.gz",
+            "id": "picai_11290_1001313"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11291/11291_1001314_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11291_1001314.nii.gz",
+            "id": "picai_11291_1001314"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11293/11293_1001316_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11293_1001316.nii.gz",
+            "id": "picai_11293_1001316"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11295/11295_1001318_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11295_1001318.nii.gz",
+            "id": "picai_11295_1001318"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11297/11297_1001320_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11297_1001320.nii.gz",
+            "id": "picai_11297_1001320"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11298/11298_1001321_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11298_1001321.nii.gz",
+            "id": "picai_11298_1001321"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11303/11303_1001326_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11303_1001326.nii.gz",
+            "id": "picai_11303_1001326"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11308/11308_1001331_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11308_1001331.nii.gz",
+            "id": "picai_11308_1001331"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11310/11310_1001333_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11310_1001333.nii.gz",
+            "id": "picai_11310_1001333"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11315/11315_1001338_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11315_1001338.nii.gz",
+            "id": "picai_11315_1001338"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11317/11317_1001340_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11317_1001340.nii.gz",
+            "id": "picai_11317_1001340"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11320/11320_1001343_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11320_1001343.nii.gz",
+            "id": "picai_11320_1001343"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11321/11321_1001344_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11321_1001344.nii.gz",
+            "id": "picai_11321_1001344"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11335/11335_1001358_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11335_1001358.nii.gz",
+            "id": "picai_11335_1001358"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11337/11337_1001360_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11337_1001360.nii.gz",
+            "id": "picai_11337_1001360"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11339/11339_1001362_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11339_1001362.nii.gz",
+            "id": "picai_11339_1001362"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11340/11340_1001363_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11340_1001363.nii.gz",
+            "id": "picai_11340_1001363"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11353/11353_1001376_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11353_1001376.nii.gz",
+            "id": "picai_11353_1001376"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11359/11359_1001382_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11359_1001382.nii.gz",
+            "id": "picai_11359_1001382"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11363/11363_1001386_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11363_1001386.nii.gz",
+            "id": "picai_11363_1001386"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11364/11364_1001387_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11364_1001387.nii.gz",
+            "id": "picai_11364_1001387"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11365/11365_1001388_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11365_1001388.nii.gz",
+            "id": "picai_11365_1001388"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11366/11366_1001389_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11366_1001389.nii.gz",
+            "id": "picai_11366_1001389"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11379/11379_1001402_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11379_1001402.nii.gz",
+            "id": "picai_11379_1001402"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11394/11394_1001418_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11394_1001418.nii.gz",
+            "id": "picai_11394_1001418"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11399/11399_1001423_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11399_1001423.nii.gz",
+            "id": "picai_11399_1001423"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11409/11409_1001433_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11409_1001433.nii.gz",
+            "id": "picai_11409_1001433"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11410/11410_1001434_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11410_1001434.nii.gz",
+            "id": "picai_11410_1001434"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11412/11412_1001436_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11412_1001436.nii.gz",
+            "id": "picai_11412_1001436"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11414/11414_1001438_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11414_1001438.nii.gz",
+            "id": "picai_11414_1001438"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11417/11417_1001441_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11417_1001441.nii.gz",
+            "id": "picai_11417_1001441"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11420/11420_1001444_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11420_1001444.nii.gz",
+            "id": "picai_11420_1001444"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11424/11424_1001448_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11424_1001448.nii.gz",
+            "id": "picai_11424_1001448"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11430/11430_1001454_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11430_1001454.nii.gz",
+            "id": "picai_11430_1001454"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11432/11432_1001456_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11432_1001456.nii.gz",
+            "id": "picai_11432_1001456"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11445/11445_1001469_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11445_1001469.nii.gz",
+            "id": "picai_11445_1001469"
+        },
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/11453/11453_1001477_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/11453_1001477.nii.gz",
+            "id": "picai_11453_1001477"
+        }
+    ],
+    "testing": [
+        {
+            "image": "zenodo/picai/record-6624726/images_nii/10005/10005_1000005_t2w.nii.gz",
+            "label": "zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/10005_1000005.nii.gz",
+            "id": "picai_10005_1000005"
+        }
+    ]
+}

@@ -1,14 +1,37 @@
 # %% [markdown]
 # # Prostate volume and PSA density in the linked PROSTATEx cohort
 #
-# Reconstruct the 190-case cohort from the local PROSTATEx mask index and PI-CAI
-# linkage, retain **all marksheet columns**, and compare clinical prostate volume
+# Reconstruct the linked cohort, retain **all marksheet columns**, and compare clinical prostate volume
 # with manual whole-gland segmentation volume. Clinical `prostate_volume` is in
 # mL (equivalently cc); it is a separate clinical measurement, not a segmentation.
 # Then compare PSA densities computed from each volume and investigate the
 # marksheet's reported PSA density against recalculated and manual-mask densities.
 # Inputs are existing local downloads; this notebook performs no downloads or
 # inference. Run cells in order. Outputs go to `results/prostatex_linked_volume/`.
+#
+# ## Study population and cohort flow
+#
+# Start from the 328 examinations in `ProstateX-mapping.json`, representing 327
+# unique subjects. The local mask index and PI-CAI public clinical marksheet
+# supply the manual whole-gland masks and clinical measurements for this analysis.
+# Expected counts are recomputed from local metadata immediately below:
+#
+# | Stage | Examinations | Explanation |
+# |---|---:|---|
+# | PROSTATEx mapping JSON | 328 | 327 subjects; one has two mapped examinations |
+# | Local manual whole-gland mask available | 194 | 134 examinations lack a local mask |
+# | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
+# | Matched clinical marksheet | 192 | All remaining examinations match |
+# | Valid clinical volume: volume analysis | **190** | Two lack usable clinical volume |
+# | PSA available: subsequent density analysis | **189** | ProstateX-0202 lacks PSA |
+#
+# Keep all 190 volume cases, including suspicious records, for volume analysis.
+# Only at the density step remove missing/nonfinite PSA. Eight cases with PSA
+# but missing reported PSAD remain in recalculated density comparisons. The
+# separate reported-PSAD diagnostic uses its 181 complete valid clinical triples.
+# Flag |reported PSAD − PSA / clinical volume| > **0.01 ng/mL²** for review only
+# (23 current cases). This diagnostic threshold is not documented source precision
+# and a flag does not identify which clinical field, if any, is wrong.
 
 # %%
 import json
@@ -24,11 +47,12 @@ from IPython.display import display
 from matplotlib.ticker import FuncFormatter, NullFormatter
 
 # Select one or more methods; order controls display order.
-SELECTED_COMPARATORS = ['clinical', 'nnunet274', 'bosma22b']
+SELECTED_COMPARATORS = ['clinical', 'nnunet274', 'rumcnotprostatex609']
 COMPARATORS = {
     'clinical': ('Manual ellipsoid', None, [1]),
-    'nnunet274': ('External (public)', None, [1]),
-    'bosma22b': ('Internal (institutional)', 'whole_gland/AI/Bosma22b', [1]),
+    'nnunet274': ('External (multi-site)', None, [1]),
+    'rumcnotprostatex609': ('Internal (RUMC)', None, [1]),
+    'bosma22b': ('Bosma22b', 'whole_gland/AI/Bosma22b', [1]),
     'guerbet23': ('Guerbet23', 'whole_gland/AI/Guerbet23', [1]),
     'heviai23': ('HeviAI23', 'zonal_pz_tz/AI/HeviAI23', [1, 2]),
     'yuan23': ('Yuan23', 'zonal_pz_tz/AI/Yuan23', [1, 2]),
@@ -48,6 +72,8 @@ MAPPING_PATH = PICAI_ROOT / 'additional_resources/ProstateX-mapping.json'
 MARKSHEET_PATH = PICAI_ROOT / 'clinical_information/marksheet.csv'
 OUTPUT_DIR = REPO_ROOT / 'results/prostatex_linked_volume'
 EXPECTED_CASES = 190
+PSAD_REPORTING_TOLERANCE = 0.01  # ng/mL²; diagnostic review threshold only
+QC_NUMERICAL_TOLERANCE = 1e-12
 
 for path in (INDEX_PATH, MAPPING_PATH, MARKSHEET_PATH):
     if not path.is_file():
@@ -60,7 +86,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # Mapping keys include acquisition dates, whereas index IDs do not. Exclude IDs
 # with multiple mapping entries rather than choosing a study arbitrarily. Join on
 # both PI-CAI patient and study IDs; require unique marksheet keys to avoid row
-# multiplication. PSA availability is not a selection criterion for this analysis.
+# multiplication. PSA and reported PSAD do not affect volume-analysis eligibility.
 
 # %%
 cases = pd.read_csv(INDEX_PATH)
@@ -75,10 +101,8 @@ links = pd.DataFrame(
     columns=['mapping_key', 'ID', 'picai_key'],
 )
 ambiguous_ids = links.loc[links['ID'].duplicated(keep=False), 'ID'].unique()
+links[['patient_id', 'study_id']] = links['picai_key'].str.split('_', expand=True).astype('int64')
 unique_links = links.loc[~links['ID'].isin(ambiguous_ids)].copy()
-unique_links[['patient_id', 'study_id']] = (
-    unique_links['picai_key'].str.split('_', expand=True).astype('int64')
-)
 cohort = cases.merge(unique_links, on='ID', how='left', validate='one_to_one')
 cohort = cohort.merge(
     marksheet, on=['patient_id', 'study_id'], how='left',
@@ -94,12 +118,108 @@ cohort['selection_status'] = np.select(
 )
 cohort.to_csv(OUTPUT_DIR / 'cohort_linkage_audit.csv', index=False)
 linked = cohort.loc[cohort['selection_status'].eq('included')].copy().reset_index(drop=True)
-display(cohort['selection_status'].value_counts().rename_axis('status').to_frame('n'))
-print(f'Included: {len(linked)}; expected: {EXPECTED_CASES}')
 assert len(linked) == EXPECTED_CASES, 'Cohort changed; inspect linkage audit before analysis'
 assert not linked.duplicated(['patient_id', 'study_id']).any(), 'Repeated linked study'
+
+# %% [markdown]
+# ### Cohort flow from the PROSTATEx mapping
+#
+# Examination and unique-patient counts are distinct. Each exclusion is relative
+# to the preceding stage. Anticipate PSA availability for the later density step
+# without filtering the volume cohort here. Invalid PSA or density denominators
+# will stop that step explicitly rather than silently remove additional cases.
+
+# %%
+mapped_masks = links.loc[links['ID'].isin(cases['ID'])]
+unambiguous_masks = mapped_masks.loc[~mapped_masks['ID'].isin(ambiguous_ids)]
+matched_marksheet = cohort.loc[cohort['picai_key'].notna() & cohort['marksheet_match'].eq('both')]
+psa_available = np.isfinite(pd.to_numeric(linked['psa'], errors='coerce'))
+flow_rows = []
+previous_examinations = previous_patients = None
+for stage, frame, reason in [
+    ('PROSTATEx mapping JSON', links, ''),
+    ('Local manual whole-gland mask available', mapped_masks, 'No local manual whole-gland mask'),
+    ('Unambiguous linkage', unambiguous_masks, 'Ambiguous PROSTATEx mapping'),
+    ('Matched clinical marksheet', matched_marksheet, 'No matching clinical marksheet'),
+    ('Valid clinical volume: volume analysis', linked, 'Missing/nonfinite/nonpositive clinical volume'),
+    ('PSA available: subsequent density analysis', linked.loc[psa_available], 'Missing/nonfinite PSA'),
+]:
+    n_examinations = len(frame)
+    n_patients = frame['patient_id'].nunique()
+    flow_rows.append(dict(
+        stage=stage, n_examinations=n_examinations, n_patients=n_patients,
+        excluded_examinations=previous_examinations - n_examinations if previous_examinations is not None else pd.NA,
+        excluded_patients=previous_patients - n_patients if previous_patients is not None else pd.NA,
+        exclusion_reason=reason, source='Local metadata',
+    ))
+    previous_examinations, previous_patients = n_examinations, n_patients
+cohort_flow = pd.DataFrame(flow_rows)
+cohort_flow.to_csv(OUTPUT_DIR / 'cohort_flow.csv', index=False)
+display(cohort_flow)
+print(f'Volume-analysis cohort: {len(linked)}; expected: {EXPECTED_CASES}')
+display(cohort['selection_status'].value_counts().rename_axis('status').to_frame('n'))
 display(linked[['ID', *marksheet.columns]])
 display(linked[marksheet.columns].isna().sum().to_frame('missing_values'))
+
+# %% [markdown]
+# ## Clinical consistency flags for review only
+#
+# Recalculate PSA / clinical volume whenever PSA and volume are finite positive,
+# even when reported PSAD is missing. Assess consistency only when reported PSAD
+# is also finite nonnegative. Flag absolute residuals above the configured
+# 0.01 ng/mL² threshold; equality passes, ignoring numerical roundoff. Missing or
+# invalid values have separate assessment statuses. No assessment removes a case
+# from volume or recalculated density analysis. Display suspicious cases after
+# measuring manual-mask and selected comparator volumes.
+
+# %%
+clinical_qc = linked.copy()
+qc_psa = pd.to_numeric(clinical_qc['psa'], errors='coerce')
+qc_volume = pd.to_numeric(clinical_qc['clinical_volume_ml'], errors='coerce')
+qc_psad = pd.to_numeric(clinical_qc['psad'], errors='coerce')
+qc_missing = ~np.isfinite(qc_psa) | ~np.isfinite(qc_volume) | ~np.isfinite(qc_psad)
+qc_invalid = qc_psa.le(0) | qc_volume.le(0) | qc_psad.lt(0)
+qc_valid = ~qc_missing & ~qc_invalid
+clinical_qc['clinical_qc_status'] = np.select(
+    [qc_missing, qc_invalid], ['missing_or_nonfinite_clinical_values', 'invalid_clinical_values'],
+    default='within_reporting_threshold',
+)
+valid_ratio_inputs = np.isfinite(qc_psa) & qc_psa.gt(0) & np.isfinite(qc_volume) & qc_volume.gt(0)
+clinical_qc['recalculated_clinical_psad'] = (
+    qc_psa / qc_volume.where(qc_volume.gt(0))
+).where(valid_ratio_inputs)
+clinical_qc['reported_minus_recalculated_psad'] = (
+    qc_psad - clinical_qc['recalculated_clinical_psad']
+).where(qc_valid)
+clinical_qc['absolute_reporting_residual_psad'] = clinical_qc['reported_minus_recalculated_psad'].abs()
+clinical_qc['reporting_residual_percent_of_recalculated'] = (
+    100 * clinical_qc['reported_minus_recalculated_psad'] / clinical_qc['recalculated_clinical_psad']
+)
+clinical_qc['volume_implied_by_reported_psad_ml'] = (
+    qc_psa / qc_psad.where(qc_psad.gt(0))
+).where(qc_valid)
+clinical_qc['implied_minus_clinical_volume_ml'] = (
+    clinical_qc['volume_implied_by_reported_psad_ml'] - qc_volume
+)
+clinical_qc['reporting_tolerance_psad'] = PSAD_REPORTING_TOLERANCE
+qc_residual = clinical_qc['absolute_reporting_residual_psad']
+clinical_qc['beyond_reporting_tolerance'] = (
+    qc_residual.gt(PSAD_REPORTING_TOLERANCE)
+    & ~np.isclose(qc_residual, PSAD_REPORTING_TOLERANCE, rtol=0, atol=QC_NUMERICAL_TOLERANCE)
+).astype('boolean').where(qc_valid)
+clinical_qc.loc[
+    clinical_qc['beyond_reporting_tolerance'].fillna(False), 'clinical_qc_status'
+] = 'suspicious_reporting_residual'
+clinical_qc.to_csv(OUTPUT_DIR / 'clinical_consistency_audit.csv', index=False)
+display(clinical_qc['clinical_qc_status'].value_counts().rename_axis('assessment').to_frame('n'))
+
+# %%
+cohort = cohort.merge(
+    clinical_qc[['ID', 'clinical_qc_status', 'beyond_reporting_tolerance']],
+    on='ID', how='left', validate='one_to_one',
+)
+cohort.to_csv(OUTPUT_DIR / 'cohort_linkage_audit.csv', index=False)
+linked = clinical_qc.copy()  # Measure every eligible volume case, irrespective of review flags.
 
 # %% [markdown]
 # ## Calculate reference whole-gland volume
@@ -137,24 +257,31 @@ volumes = linked.merge(pd.DataFrame(reference_rows), on='ID', validate='one_to_o
 # ## Selected measurements on native grids
 #
 # Clinical volume is reported in the marksheet and labeled "Manual ellipsoid"
-# in this analysis. PI-CAI masks are matched by patient/study ID. Bosma22b and
-# Guerbet23 use whole-gland label 1; HeviAI23 and Yuan23 use PZ=1 and TZ=2.
+# in this analysis. Dataset274 and Dataset609 predictions are matched by PROSTATEx
+# ID and use whole-gland label 1. PI-CAI masks are matched by patient/study ID.
+# Bosma22b and Guerbet23 use whole-gland label 1; HeviAI23 and Yuan23 use PZ=1 and TZ=2.
 # Their union is measured in memory. No resampling or spatial evaluation is
 # performed. Empty predictions remain zero-volume failures; invalid inputs stop.
 
 # %%
-MODEL_ROOT = REPO_ROOT / 'results/prostatex_pred_pooled2_3d_fullres'
-if 'nnunet274' in SELECTED_COMPARATORS:
-    assert json.loads((MODEL_ROOT / 'plans.json').read_text())['dataset_name'] == 'Dataset274_raw'
-    assert json.loads((MODEL_ROOT / 'dataset.json').read_text())['labels'] == {'background': 0, 'class1': 1}
+MODEL_ROOTS = {
+    'nnunet274': (REPO_ROOT / 'results/prostatex_pred_pooled2_3d_fullres', 'Dataset274_raw'),
+    'rumcnotprostatex609': (
+        REPO_ROOT / 'results/prostatex_pred_rumcnotprostatex609_3d_fullres', 'Dataset609_raw',
+    ),
+}
 for key in SELECTED_COMPARATORS:
     if key == 'clinical':
         continue
     _, source, foreground = COMPARATORS[key]
+    if key in MODEL_ROOTS:
+        model_root, dataset_name = MODEL_ROOTS[key]
+        assert json.loads((model_root / 'plans.json').read_text())['dataset_name'] == dataset_name, key
+        assert json.loads((model_root / 'dataset.json').read_text())['labels'] == {'background': 0, 'class1': 1}, key
     prediction_rows = []
     for case in linked.itertuples(index=False):
-        if key == 'nnunet274':
-            path = MODEL_ROOT / f'{case.ID}.nii.gz'
+        if key in MODEL_ROOTS:
+            path = model_root / f'{case.ID}.nii.gz'
         else:
             filename = f'{int(case.patient_id)}_{int(case.study_id)}.nii.gz'
             path = PICAI_ROOT / 'anatomical_delineations' / source / filename
@@ -181,12 +308,62 @@ for key in SELECTED_COMPARATORS:
     volumes = volumes.merge(pd.DataFrame(prediction_rows), on='ID', validate='one_to_one')
 
 # %% [markdown]
+# ## Suspicious clinical cases retained in analysis
+#
+# Display every suspicious record in descending absolute reporting residual,
+# with clinical and manual-mask volumes in mL and densities in ng/mL². Export
+# all marksheet fields, paths, measurements, and comparator errors for review.
+# All cases remain in volume analysis, including those missing PSA or reported
+# PSAD. Ground-truth volume is shown for context and does not determine flags.
+
+# %%
+volumes_all = volumes.copy()
+volumes_all['manual_mask_path'] = volumes_all['label_wg'].map(lambda path: str(MASK_ROOT / path))
+volumes_all['mask_index_path'] = str(INDEX_PATH)
+volumes_all['marksheet_path'] = str(MARKSHEET_PATH)
+volumes_all['mapping_path'] = str(MAPPING_PATH)
+for key in SELECTED_COMPARATORS:
+    error = volumes_all[f'{key}_volume_ml'] - volumes_all['gt_volume_ml']
+    volumes_all[f'{key}_minus_gt_ml'] = error
+    volumes_all[f'{key}_absolute_error_ml'] = error.abs()
+    volumes_all[f'{key}_absolute_percentage_error'] = 100 * error.abs() / volumes_all['gt_volume_ml']
+volumes_all['manual_mask_psad'] = (
+    pd.to_numeric(volumes_all['psa'], errors='coerce').where(
+        np.isfinite(pd.to_numeric(volumes_all['psa'], errors='coerce'))
+        & pd.to_numeric(volumes_all['psa'], errors='coerce').gt(0)
+    )
+    / volumes_all['gt_volume_ml']
+)
+volumes_all.to_csv(OUTPUT_DIR / 'comparator_volumes_all_cases.csv', index=False)
+clinical_case_review = volumes_all.loc[
+    volumes_all['beyond_reporting_tolerance'].fillna(False)
+].sort_values('absolute_reporting_residual_psad', ascending=False).copy()
+clinical_case_review['review_reason'] = 'Absolute reported-minus-recalculated PSAD exceeds review threshold'
+clinical_case_review.to_csv(OUTPUT_DIR / 'clinical_case_review.csv', index=False)
+suspicious_columns = [
+    'ID', 'patient_id', 'study_id', 'psa', 'psad', 'clinical_volume_ml', 'gt_volume_ml',
+    'recalculated_clinical_psad', 'reported_minus_recalculated_psad',
+    'absolute_reporting_residual_psad', 'reporting_residual_percent_of_recalculated',
+    'volume_implied_by_reported_psad_ml', 'implied_minus_clinical_volume_ml',
+    'reporting_tolerance_psad',
+]
+clinical_suspicious_cases = clinical_case_review[suspicious_columns].copy()
+clinical_suspicious_cases.to_csv(OUTPUT_DIR / 'clinical_suspicious_cases.csv', index=False)
+print(f'Suspicious clinical cases: {len(clinical_case_review)}; all retained in volume analysis.')
+print(clinical_suspicious_cases.to_string(index=False))
+print('Detailed clinical case review, including masks and comparator errors (all rows and columns):')
+print(clinical_case_review.to_string(index=False))
+volumes = volumes_all.copy().reset_index(drop=True)
+print(f'Volume-analysis cohort: {len(volumes)}; no clinical review flags excluded')
+assert len(volumes) >= 2, 'Fewer than two eligible volume cases'
+
+# %% [markdown]
 # ## Volume accuracy against manual whole-gland ground truth
 #
-# **Manual ellipsoid** is the reported clinical volume. **External (public)**
-# identifies Dataset274 nnUNet, trained on public data external to this evaluation
-# dataset. **Internal (institutional)** identifies Bosma22b, from the same
-# institution as the evaluation dataset.
+# **Manual ellipsoid** is the reported clinical volume. **External (multi-site)**
+# identifies Dataset274 nnUNet. **Internal (RUMC)** identifies Dataset609 nnUNet
+# predictions from the RUMC training cohort excluding PROSTATEx. Bosma22b remains
+# available as an optional comparator under its own name.
 #
 # Positive signed errors indicate overestimation. Limits of agreement are bias
 # ± 1.96 sample SD, not confidence intervals. Rank by MAE on this linked cohort;
@@ -249,12 +426,13 @@ RELATIVE_DIFFERENCE_LIMITS = (-90, 90)
 PLOT_STYLES = {
     'clinical': dict(color='#4C6A85', marker='o', linestyle='-'),
     'nnunet274': dict(color='#B88254', marker='s', linestyle='--'),
-    'bosma22b': dict(color='#91A78C', marker='^', linestyle=':'),
+    'rumcnotprostatex609': dict(color='#91A78C', marker='^', linestyle=':'),
+    'bosma22b': dict(color='#7D8995', marker='X', linestyle=(0, (1, 1))),
     'guerbet23': dict(color='#806A88', marker='D', linestyle='-.'),
     'heviai23': dict(color='#AD7773', marker='v', linestyle=(0, (5, 1, 1, 1))),
     'yuan23': dict(color='#C2B18A', marker='P', linestyle=(0, (3, 1, 1, 1, 1, 1))),
 }
-scatter_options = dict(s=16, edgecolors='0.1', linewidths=.4)
+scatter_options = dict(s=16, edgecolors='none', linewidths=0, alpha=.6)
 legend_options = dict(
     fontsize=7, frameon=True, framealpha=.85, facecolor='white',
     edgecolor='0.6', loc='best', handlelength=1, handletextpad=.4,
@@ -275,7 +453,7 @@ summary_by_method = summary.set_index('method')
 
 for column, key in enumerate(SELECTED_COMPARATORS):
     name = COMPARATORS[key][0]
-    panel_name = fill(name, width=16)
+    panel_name = fill(name, width=16, break_on_hyphens=False)
     style = PLOT_STYLES[key]
     metrics = summary_by_method.loc[key]
 
@@ -344,7 +522,8 @@ for row, difference_table in [(1, differences_ml), (2, differences_percent)]:
         style = PLOT_STYLES[key]
         ax.stairs(
             counts, histogram_edges, orientation='horizontal', color=style['color'],
-            linestyle=style['linestyle'], linewidth=1.2, label=fill(COMPARATORS[key][0], width=16),
+            linestyle=style['linestyle'], linewidth=1.2,
+            label=fill(COMPARATORS[key][0], width=16, break_on_hyphens=False),
         )
     ax.set_xlim(left=0)
     ax.locator_params(axis='x', nbins=3, integer=True)
@@ -365,7 +544,7 @@ plt.show()
 # ## Paired absolute-error comparisons
 #
 # Positive improvement means method A is closer than method B. Exactly equal
-# absolute errors are ties. All methods use the same 190 cases.
+# absolute errors are ties. All methods use the complete volume-analysis cohort.
 
 # %%
 pair_tables = []
@@ -608,12 +787,12 @@ pairwise_statistics.to_csv(OUTPUT_DIR / 'comparator_pairwise_statistics.csv', in
 # Recalculate densities rather than substituting the marksheet's reported `psad`.
 # A separate analysis at the end examines that reported value.
 #
-# Retain all 190 cases in the audit. Calculate densities for finite nonnegative
-# PSA and positive finite volumes. Continuous comparisons, log plots, and strata
-# use a common subset with **positive** PSA and valid reference and selected-method
-# volumes. Zero PSA is excluded because relative errors and log axes are undefined.
-# Missing PSA or invalid denominators are not imputed. This does not change the
-# volume-analysis cohort. Display and export the reasons and sample size.
+# Retain all volume-analysis cases in this audit, then remove missing/nonfinite
+# PSA only (currently ProstateX-0202), giving 189 density cases. Reported PSAD and
+# review flags do not affect eligibility. Finite PSA must be positive and reference
+# and selected-method volumes must be finite positive; unexpected invalid values
+# stop execution rather than silently shrink the cohort. These requirements allow
+# relative errors and log axes. Nothing is imputed or removed from volume analysis.
 
 # %%
 PSAD_UNIT = 'ng/mL²'
@@ -640,7 +819,16 @@ for key in ['gt', *SELECTED_COMPARATORS]:
 
 psad_audit.to_csv(OUTPUT_DIR / 'psa_density_cohort_audit.csv', index=False)
 display(psad_audit['psa_density_status'].value_counts().rename_axis('status').to_frame('n'))
-psad_cases = psad_audit.loc[psad_audit['psa_density_status'].eq('included')].copy()
+psa_present = np.isfinite(psad_psa)
+assert psad_psa.loc[psa_present].gt(0).all(), 'Nonpositive PSA; inspect the density audit'
+for key in ['gt', *SELECTED_COMPARATORS]:
+    assert psad_audit.loc[psa_present, f'{key}_valid_psad_volume'].all(), (
+        f'Invalid {key} volume for PSA-density analysis; inspect the density audit'
+    )
+    assert np.isfinite(psad_audit.loc[psa_present, f'{key}_psad']).all(), (
+        f'Nonfinite {key} PSA density; inspect the density audit'
+    )
+psad_cases = psad_audit.loc[psa_present].copy()
 print(f'PSA-density comparisons: {len(psad_cases)} / {len(psad_audit)} cases')
 assert len(psad_cases) >= 2, 'Fewer than two eligible PSA-density cases; inspect the audit'
 assert psad_cases['patient_id'].is_unique, 'Patient-level resampling requires unique patients'
@@ -704,7 +892,7 @@ fig.get_layout_engine().set(w_pad=.015, h_pad=.015, wspace=.02, hspace=.02)
 axes[0, -1].set_axis_off()
 for column, key in enumerate(SELECTED_COMPARATORS):
     name = COMPARATORS[key][0]
-    panel_name = fill(name, width=16)
+    panel_name = fill(name, width=16, break_on_hyphens=False)
     style = PLOT_STYLES[key]
     metrics = psad_summary_by_method.loc[key]
     ax = axes[0, column]
@@ -760,7 +948,8 @@ for row, table in [(1, psad_differences), (2, psad_relative_differences)]:
         style = PLOT_STYLES[key]
         ax.stairs(
             counts, edges, orientation='horizontal', color=style['color'],
-            linestyle=style['linestyle'], linewidth=1.2, label=fill(COMPARATORS[key][0], 16),
+            linestyle=style['linestyle'], linewidth=1.2,
+            label=fill(COMPARATORS[key][0], width=16, break_on_hyphens=False),
         )
     ax.set_xlim(left=0)
     ax.locator_params(axis='x', nbins=3, integer=True)
@@ -888,6 +1077,88 @@ fig.colorbar(heatmap, ax=list(axes.flat), label='Proportion within reference str
 fig.savefig(OUTPUT_DIR / 'psa_density_confusion.png', dpi=300)
 fig.savefig(OUTPUT_DIR / 'psa_density_confusion.pdf')
 plt.show()
+
+# %% [markdown]
+# ## PSA density: paired stratum-accuracy comparisons
+#
+# Which method assigns more patients to the same stratum as the manual-mask
+# reference? For each selected pair, compare correct/incorrect assignments on
+# the same eligible patients using a two-sided exact McNemar test. The paired
+# 2×2 table has rows A correct/incorrect and columns B correct/incorrect; it is
+# distinct from the displayed 4×4 reference-versus-estimate matrices.
+#
+# Accuracy difference = 100 × (accuracy A − accuracy B), in percentage points;
+# positive favors A. Holm correction covers all selected pairs as a separate
+# family from continuous-error tests, without an omnibus gate. Conclusions use
+# adjusted p-values at the existing ALPHA (0.05). No discordant correctness
+# assignments gives p=1; no significant difference does not establish equivalence.
+# Quadratic weighted kappa remains descriptive. These tests assess exact stratum
+# agreement, not ordinal error severity or cancer detection. Patients are treated
+# as independent; predictions are fixed, and cohort selection limits generalization.
+
+# %%
+from statsmodels.stats.contingency_tables import mcnemar
+from statsmodels.stats.multitest import multipletests
+
+psad_stratum_columns = ['gt_psad_stratum', *[
+    f'{key}_psad_stratum' for key in SELECTED_COMPARATORS
+]]
+assert psad_cases[psad_stratum_columns].notna().all().all(), 'Missing PSA-density stratum'
+psad_stratum_statistics_rows = []
+for a, b in combinations(SELECTED_COMPARATORS, 2):
+    correct_a = psad_cases[f'{a}_psad_stratum'].eq(psad_cases['gt_psad_stratum'])
+    correct_b = psad_cases[f'{b}_psad_stratum'].eq(psad_cases['gt_psad_stratum'])
+    both_correct = int((correct_a & correct_b).sum())
+    a_only_correct = int((correct_a & ~correct_b).sum())
+    b_only_correct = int((~correct_a & correct_b).sum())
+    both_incorrect = int((~correct_a & ~correct_b).sum())
+    n = len(psad_cases)
+    assert both_correct + a_only_correct + b_only_correct + both_incorrect == n
+    assert both_correct + a_only_correct == np.trace(psad_confusion_matrices[a])
+    assert both_correct + b_only_correct == np.trace(psad_confusion_matrices[b])
+    correctness_table = [[both_correct, a_only_correct], [b_only_correct, both_incorrect]]
+    pvalue = (
+        mcnemar(correctness_table, exact=True).pvalue
+        if a_only_correct + b_only_correct else 1.0
+    )
+    accuracy_a, accuracy_b = correct_a.mean(), correct_b.mean()
+    psad_stratum_statistics_rows.append(dict(
+        method_a=a, name_a=COMPARATORS[a][0], method_b=b, name_b=COMPARATORS[b][0],
+        n=n, both_correct=both_correct, a_only_correct=a_only_correct,
+        b_only_correct=b_only_correct, both_incorrect=both_incorrect,
+        accuracy_a=accuracy_a, accuracy_b=accuracy_b,
+        accuracy_difference_pp=100 * (accuracy_a - accuracy_b), mcnemar_exact_p=pvalue,
+    ))
+
+psad_stratum_pairwise_statistics = pd.DataFrame(psad_stratum_statistics_rows, columns=[
+    'method_a', 'name_a', 'method_b', 'name_b', 'n', 'both_correct',
+    'a_only_correct', 'b_only_correct', 'both_incorrect', 'accuracy_a', 'accuracy_b',
+    'accuracy_difference_pp', 'mcnemar_exact_p',
+])
+if not psad_stratum_pairwise_statistics.empty:
+    psad_stratum_pairwise_statistics['mcnemar_exact_p_holm'] = multipletests(
+        psad_stratum_pairwise_statistics['mcnemar_exact_p'], method='holm',
+    )[1]
+    p = psad_stratum_pairwise_statistics['mcnemar_exact_p_holm']
+    effect = psad_stratum_pairwise_statistics['accuracy_difference_pp']
+    psad_stratum_pairwise_statistics['conclusion'] = np.select(
+        [(p <= ALPHA) & effect.gt(0), (p <= ALPHA) & effect.lt(0)],
+        ['A better', 'B better'], default='no significant difference',
+    )
+else:
+    psad_stratum_pairwise_statistics['mcnemar_exact_p_holm'] = pd.Series(dtype=float)
+    psad_stratum_pairwise_statistics['conclusion'] = pd.Series(dtype=str)
+    print('One comparator selected: no pairwise stratum-accuracy tests.')
+psad_stratum_pairwise_statistics['holm_family_size'] = len(psad_stratum_statistics_rows)
+psad_stratum_pairwise_statistics['alpha'] = ALPHA
+print('Accuracy difference in percentage points: positive favors A. P-values are Holm-adjusted.')
+display(psad_stratum_pairwise_statistics[[
+    'name_a', 'name_b', 'n', 'accuracy_a', 'accuracy_b', 'accuracy_difference_pp',
+    'mcnemar_exact_p_holm', 'conclusion',
+]])
+psad_stratum_pairwise_statistics.to_csv(
+    OUTPUT_DIR / 'psa_density_stratum_pairwise_statistics.csv', index=False,
+)
 
 # %% [markdown]
 # ## PSA density: paired absolute-error comparisons
@@ -1142,7 +1413,9 @@ psad_pairwise_statistics.to_csv(OUTPUT_DIR / 'psa_density_pairwise_statistics.cs
 # ## Reported marksheet PSA density: reporting and volume components
 #
 # Examine the marksheet's **reported `psad`** separately, using its own complete
-# subset, independent of selected prediction methods. Compare it with both
+# subset of the complete volume-analysis cohort, including suspicious cases,
+# independent of selected prediction methods. This is a reporting diagnostic,
+# requiring reported PSAD only for these comparisons. Compare it with both
 # **PSA / clinical volume** (arithmetic consistency) and **PSA / manual-mask volume**
 # (total disagreement). Also compare recalculated clinical density with manual-mask
 # density on these same cases so missing reported values cannot confound that comparison.
@@ -1158,19 +1431,16 @@ psad_pairwise_statistics.to_csv(OUTPUT_DIR / 'psa_density_pairwise_statistics.cs
 # difference attributable to using clinical rather than manual-mask volume for
 # the same PSA. The decomposition is arithmetic, not causal attribution.
 #
-# Flag absolute reporting residuals **> 0.005 ng/mL²** as a diagnostic. This is
-# the half-step for rounding density alone to two decimal places, an explicit
-# assumption, not a known precision shared by all reported values. Rounded PSA
+# Flag absolute reporting residuals **> 0.01 ng/mL²** as a diagnostic, using
+# the same configured review threshold as the early consistency assessment,
+# not a known precision shared by all reported values. Rounded PSA
 # and volume can also produce residuals beyond this band. Inspect signed/relative
 # residuals, implied volumes, and the largest discrepancies rather than labeling
 # every flag an error. Reported zero density remains valid; implied volume is
 # undefined for it, and it cannot appear on a logarithmic density axis.
 
 # %%
-PSAD_REPORTING_TOLERANCE = 0.005  # ng/mL²; diagnostic two-decimal half-step
-reported_psad_audit = volumes[[
-    'ID', 'patient_id', 'study_id', 'psa', 'psad', 'clinical_volume_ml', 'gt_volume_ml',
-]].copy()
+reported_psad_audit = volumes_all.copy()
 reported_psa = pd.to_numeric(reported_psad_audit['psa'], errors='coerce')
 reported_value = pd.to_numeric(reported_psad_audit['psad'], errors='coerce')
 reported_psad_audit['reported_psad'] = reported_value
@@ -1215,7 +1485,7 @@ reported_psad_audit['reporting_residual_percent_of_recalculated'] = (
 # Ignore only numerical roundoff at the diagnostic tolerance itself.
 reported_psad_audit['beyond_reporting_tolerance'] = (
     reporting_residual.abs().gt(PSAD_REPORTING_TOLERANCE)
-    & ~np.isclose(reporting_residual.abs(), PSAD_REPORTING_TOLERANCE, rtol=0, atol=1e-12)
+    & ~np.isclose(reporting_residual.abs(), PSAD_REPORTING_TOLERANCE, rtol=0, atol=QC_NUMERICAL_TOLERANCE)
 ).astype('boolean').where(reporting_included)
 reported_psad_audit['volume_implied_by_reported_psad_ml'] = (
     reported_psa / reported_value.where(reported_value.gt(0))
@@ -1314,7 +1584,7 @@ with pd.option_context('display.max_columns', None):
         'recalculated_minus_manual_mask_psad', 'reported_minus_manual_mask_psad',
         'reporting_change_in_absolute_manual_mask_error_psad',
         'beyond_reporting_tolerance', 'volume_implied_by_reported_psad_ml',
-    ]].head(20))
+    ]])
 
 # %% [markdown]
 # ### Reported-density agreement and propagation diagnostic
@@ -1322,8 +1592,8 @@ with pd.option_context('display.max_columns', None):
 # All three agreement columns use the same complete cases. In the final scatter,
 # x is the clinical-volume component and y is total reported-minus-manual-mask
 # disagreement. Vertical displacement from the identity line equals the reporting
-# residual. Color shows that residual with a symmetric scale. The ±0.005 band in
-# the reporting-residual plot is a diagnostic rounding assumption only.
+# residual. Color shows that residual with a symmetric scale. The ±0.01 band in
+# the reporting-residual plot is a diagnostic review threshold only.
 # The exported change in absolute manual-mask error is positive when reporting
 # increases that error and negative when the reporting residual offsets some of
 # the clinical-volume disagreement. Neither sign establishes the reporting cause.
@@ -1338,19 +1608,19 @@ if reported_n:
         reference = reported_psad_cases[reference_column]
         metrics = reported_psad_summary.set_index('comparison').loc[comparison]
         ax = axes[0, column]
-        ax.scatter(reference, estimate, s=16, alpha=.8, color='#4C6A85')
+        ax.scatter(reference, estimate, s=16, alpha=.6, color='#4C6A85', edgecolors='none', linewidths=0)
         ax.plot([report_lower, report_upper], [report_lower, report_upper], 'k--', linewidth=.8)
         ax.set(xscale='log', yscale='log', xlim=(report_lower, report_upper), ylim=(report_lower, report_upper),
                ylabel=f'{estimate_name}\ndensity ({PSAD_UNIT})')
         ax.set_title(f'{estimate_name}\nvs {reference_name}\nn = {reported_n}; r = {metrics.pearson_r:.3f}', fontsize=10)
         ax = axes[1, column]
-        ax.scatter(reference, estimate - reference, s=16, alpha=.8, color='#4C6A85',
+        ax.scatter(reference, estimate - reference, s=16, alpha=.6, color='#4C6A85', edgecolors='none', linewidths=0,
                    label=f'MAE = {metrics.mae_psad:.3g}\nRMSE = {metrics.rmse_psad:.3g}')
         for level, linestyle in [(metrics.bias_psad, '-'), (metrics.loa_lower_psad, '--'), (metrics.loa_upper_psad, '--')]:
             ax.axhline(level, color='#4C6A85', linestyle=linestyle, linewidth=.8)
         if column == 0:
             ax.axhspan(-PSAD_REPORTING_TOLERANCE, PSAD_REPORTING_TOLERANCE,
-                       color='#91A78C', alpha=.2, label='±0.005 diagnostic band')
+                       color='#91A78C', alpha=.2, label=f'±{PSAD_REPORTING_TOLERANCE:g} diagnostic band')
         ax.set(xscale='log', xlim=(report_lower, report_upper), ylabel=f'Estimate − reference\n({PSAD_UNIT})')
         ax.legend(fontsize=8)
         for row in range(2):
@@ -1372,7 +1642,7 @@ if reported_n:
     y = reported_psad_cases['reported_minus_manual_mask_psad']
     color_limit = max(residual.abs().max(), PSAD_REPORTING_TOLERANCE)
     scatter = axes[1].scatter(x, y, c=residual, cmap='coolwarm', vmin=-color_limit, vmax=color_limit,
-                              s=20, edgecolors='0.3', linewidths=.3)
+                              s=20, edgecolors='none', linewidths=0, alpha=.6)
     lower, upper = min(x.min(), y.min()), max(x.max(), y.max())
     if lower == upper:
         lower, upper = lower - PSAD_REPORTING_TOLERANCE, upper + PSAD_REPORTING_TOLERANCE
@@ -1407,3 +1677,180 @@ if reported_n:
     plt.show()
 else:
     print('No complete reported-density cases: reporting figures were not generated.')
+
+# %% [markdown]
+# ## PI-RADS 3: biopsy decisions against clinically significant cancer
+#
+# The July 2026 labels release adds comma-separated `lesion_PIRADS` scores.
+# Define a case's PI-RADS as its maximum numeric lesion score and select maximum
+# **3**, excluding cases with a coexisting PI-RADS 4/5 lesion. Ignore missing and
+# `N/A` entries; do not assign a numeric score when none is available. Scores mix
+# PI-RADS v1/2/2.1 according to the guidelines used at examination. Fall back to
+# the entire eligible linked cohort only when the column is absent, never when
+# the selected subgroup is empty. Current local data yield 26 eligible cases:
+# 5 with `case_ISUP >= 2` (csPCa) and 21 with `case_ISUP <= 1`.
+#
+# Simulate recommending biopsy at **unrounded PSA density >= 0.15 ng/mL²**;
+# equality recommends biopsy. Evaluate manual-mask density and every selected
+# comparator using the same PSA and patients. The outcome reference is case-level
+# ISUP, including grade 0; manual-mask density is another evaluated measurement.
+# Reported marksheet density is not used. Retain clinical review flags. Audit all
+# volume cases, including missing PSA, unavailable scores, and invalid outcomes.
+#
+# This is a retrospective threshold simulation, not observed biopsy management.
+# The source dataset uses convenience sampling, mixes PI-RADS versions, and can
+# include MRI-confirmed negatives without tissue sampling or follow-up. Results
+# describe this selected cohort, not routine-care performance or prevalence.
+
+# %%
+BIOPSY_PSAD_THRESHOLD = 0.15  # ng/mL²; compare unrounded calculated values
+biopsy_methods = ['gt', *SELECTED_COMPARATORS]
+biopsy_names = {'gt': 'Manual mask', **{key: COMPARATORS[key][0] for key in SELECTED_COMPARATORS}}
+biopsy_audit = psad_audit.copy()
+biopsy_audit['case_max_pirads'] = np.nan
+if 'lesion_PIRADS' in biopsy_audit:
+    biopsy_cohort = 'maximum_PI-RADS_3'
+    for index, row in biopsy_audit.iterrows():
+        raw_scores = row['lesion_PIRADS']
+        scores = []
+        for token in ([] if pd.isna(raw_scores) else str(raw_scores).split(',')):
+            token = token.strip()
+            if not token or token.upper() == 'N/A':
+                continue
+            try:
+                score = float(token)
+            except ValueError as error:
+                raise ValueError(f'{row.ID}: invalid lesion_PIRADS token {token!r}') from error
+            if not np.isfinite(score) or score not in [1, 2, 3, 4, 5]:
+                raise ValueError(f'{row.ID}: lesion_PIRADS score outside integers 1–5: {token!r}')
+            scores.append(int(score))
+        if scores:
+            biopsy_audit.loc[index, 'case_max_pirads'] = max(scores)
+    biopsy_selected = biopsy_audit['case_max_pirads'].eq(3)
+    biopsy_audit['biopsy_pirads_status'] = np.select(
+        [biopsy_audit['case_max_pirads'].isna(), biopsy_selected],
+        ['no_numeric_pirads', 'maximum_pirads_3'], default='outside_pirads_3',
+    )
+else:
+    biopsy_cohort = 'entire_linked_cohort_PI-RADS_unavailable'
+    biopsy_selected = pd.Series(True, index=biopsy_audit.index)
+    biopsy_audit['biopsy_pirads_status'] = 'pirads_column_absent'
+
+biopsy_isup_raw = biopsy_audit['case_ISUP']
+biopsy_isup = pd.to_numeric(biopsy_isup_raw, errors='coerce')
+biopsy_isup_missing = (
+    biopsy_isup_raw.isna() | biopsy_isup_raw.astype(str).str.strip().str.upper().isin(['', 'N/A'])
+)
+biopsy_isup_valid = np.isfinite(biopsy_isup) & biopsy_isup.isin([0, 1, 2, 3, 4, 5])
+biopsy_audit['case_isup_numeric'] = biopsy_isup
+biopsy_audit['biopsy_outcome_status'] = np.select(
+    [biopsy_isup_missing, ~biopsy_isup_valid],
+    ['missing_case_isup', 'invalid_case_isup'], default='valid_case_isup',
+)
+biopsy_audit['case_cspca'] = biopsy_isup.ge(2).astype('boolean').where(biopsy_isup_valid)
+biopsy_audit['biopsy_cohort'] = biopsy_cohort
+biopsy_audit['biopsy_cutoff_psad'] = BIOPSY_PSAD_THRESHOLD
+biopsy_audit['biopsy_analysis_status'] = np.select(
+    [~biopsy_selected, biopsy_audit['psa_density_status'].ne('included'), ~biopsy_isup_valid],
+    ['outside_selected_subgroup', biopsy_audit['psa_density_status'], biopsy_audit['biopsy_outcome_status']],
+    default='included',
+)
+biopsy_audit.to_csv(OUTPUT_DIR / 'psa_density_biopsy_audit.csv', index=False)
+biopsy_cases = biopsy_audit.loc[biopsy_audit['biopsy_analysis_status'].eq('included')].copy()
+assert biopsy_cases['patient_id'].is_unique, 'Biopsy analysis requires unique patients'
+biopsy_truth = biopsy_cases['case_cspca'].astype(bool)
+biopsy_n = len(biopsy_cases)
+biopsy_positive_n = int(biopsy_truth.sum())
+biopsy_negative_n = biopsy_n - biopsy_positive_n
+print(f'Biopsy cohort: {biopsy_cohort}; n = {biopsy_n}; '
+      f'csPCa = {biopsy_positive_n}; no csPCa = {biopsy_negative_n}')
+display(biopsy_audit['biopsy_analysis_status'].value_counts().rename_axis('status').to_frame('n'))
+display(biopsy_audit['biopsy_outcome_status'].value_counts().rename_axis('outcome_status').to_frame('n'))
+
+biopsy_summary_rows, biopsy_confusion_rows = [], []
+for key in biopsy_methods:
+    density = pd.to_numeric(biopsy_cases[f'{key}_psad'], errors='coerce')
+    assert (np.isfinite(density) & density.gt(0)).all(), f'Invalid {key} biopsy density'
+    recommended = density.ge(BIOPSY_PSAD_THRESHOLD)
+    biopsy_cases[f'{key}_biopsy_recommended'] = recommended
+    tp = int((biopsy_truth & recommended).sum())
+    fp = int((~biopsy_truth & recommended).sum())
+    fn = int((biopsy_truth & ~recommended).sum())
+    tn = int((~biopsy_truth & ~recommended).sum())
+    biopsy_cases[f'{key}_biopsy_outcome'] = np.select(
+        [biopsy_truth & recommended, ~biopsy_truth & recommended, biopsy_truth & ~recommended],
+        ['TP', 'FP', 'FN'], default='TN',
+    )
+    biopsy_metadata = dict(
+        method=key, name=biopsy_names[key], cohort=biopsy_cohort,
+        cutoff_psad=BIOPSY_PSAD_THRESHOLD, density_unit=PSAD_UNIT, n=biopsy_n,
+    )
+    biopsy_summary_rows.append(dict(
+        **biopsy_metadata, n_cspca=biopsy_positive_n, n_non_cspca=biopsy_negative_n,
+        tp=tp, fp=fp, fn=fn, tn=tn,
+        biopsies_recommended_n=tp + fp, biopsies_avoided_n=tn + fn,
+        cspca_detected_n=tp, cspca_missed_n=fn,
+        sensitivity=tp / (tp + fn) if tp + fn else np.nan,
+        specificity=tn / (tn + fp) if tn + fp else np.nan,
+        ppv=tp / (tp + fp) if tp + fp else np.nan,
+        npv=tn / (tn + fn) if tn + fn else np.nan,
+        accuracy=(tp + tn) / biopsy_n if biopsy_n else np.nan,
+        biopsies_recommended_fraction=(tp + fp) / biopsy_n if biopsy_n else np.nan,
+        biopsies_avoided_fraction=(tn + fn) / biopsy_n if biopsy_n else np.nan,
+        cspca_missed_fraction=fn / biopsy_positive_n if biopsy_positive_n else np.nan,
+    ))
+    for truth, decision, outcome, count in [
+        (False, False, 'TN', tn), (False, True, 'FP', fp),
+        (True, False, 'FN', fn), (True, True, 'TP', tp),
+    ]:
+        support = biopsy_positive_n if truth else biopsy_negative_n
+        biopsy_confusion_rows.append(dict(
+            **biopsy_metadata, case_cspca=truth, biopsy_recommended=decision,
+            outcome=outcome, count=count, outcome_support=support,
+            row_proportion=count / support if support else np.nan,
+        ))
+
+biopsy_summary = pd.DataFrame(biopsy_summary_rows)
+biopsy_confusion = pd.DataFrame(biopsy_confusion_rows)
+biopsy_cases.to_csv(OUTPUT_DIR / 'psa_density_biopsy_per_case.csv', index=False)
+biopsy_summary.to_csv(OUTPUT_DIR / 'psa_density_biopsy_summary.csv', index=False)
+biopsy_confusion.to_csv(OUTPUT_DIR / 'psa_density_biopsy_confusion.csv', index=False)
+with pd.option_context('display.max_columns', None):
+    display(biopsy_summary)
+if not biopsy_n:
+    print('No eligible biopsy-analysis cases; exported empty per-case data and zero-count summaries.')
+
+# %% [markdown]
+# ### Biopsy decisions: confusion matrices
+#
+# Rows are case-level cancer outcomes; columns are simulated biopsy decisions.
+# Each cell shows its count and percentage within the outcome row. Sensitivity
+# and missed-cancer fraction use csPCa cases as denominator; specificity uses
+# non-csPCa cases. PPV/NPV use recommended/avoided biopsies, respectively. Biopsy
+# fractions and accuracy use all included cases. Undefined ratios are NaN.
+# Even an empty subgroup refreshes the figures, with zero counts and no percentages.
+
+# %%
+fig, axes = plt.subplots(
+    1, len(biopsy_methods), figsize=(3.3 * len(biopsy_methods), 4),
+    squeeze=False, constrained_layout=True,
+)
+for ax, key in zip(axes.ravel(), biopsy_methods):
+    method_confusion = biopsy_confusion.loc[biopsy_confusion['method'].eq(key)]
+    counts = method_confusion['count'].to_numpy().reshape(2, 2)
+    proportions = method_confusion['row_proportion'].to_numpy().reshape(2, 2)
+    heatmap = ax.imshow(np.ma.masked_invalid(proportions), vmin=0, vmax=1, cmap='Blues')
+    for i, j in np.ndindex(counts.shape):
+        percent = f'{proportions[i, j]:.1%}' if np.isfinite(proportions[i, j]) else '—'
+        ax.text(j, i, f'{counts[i, j]}\n{percent}', ha='center', va='center',
+                color='white' if proportions[i, j] > .5 else 'black')
+    ax.set_xticks([0, 1], labels=['Avoid biopsy', 'Recommend biopsy'], rotation=25, ha='right', fontsize=8)
+    ax.set_yticks([0, 1], labels=['No csPCa\n(ISUP 0–1)', 'csPCa\n(ISUP 2–5)'], fontsize=8)
+    ax.set_xlabel('Biopsy decision', fontsize=9)
+    ax.set_ylabel('Case outcome', fontsize=9)
+    ax.set_title(f'{biopsy_names[key]}\nn = {biopsy_n}', fontsize=10)
+fig.suptitle(f'{biopsy_cohort.replace("_", " ")} | PSAD ≥ {BIOPSY_PSAD_THRESHOLD:g} {PSAD_UNIT}', fontsize=11)
+fig.colorbar(heatmap, ax=list(axes.ravel()), label='Proportion within outcome row', shrink=.8)
+fig.savefig(OUTPUT_DIR / 'psa_density_biopsy_confusion.png', dpi=300)
+fig.savefig(OUTPUT_DIR / 'psa_density_biopsy_confusion.pdf')
+plt.show()

@@ -1,0 +1,7 @@
+modality: MRI
+datalist: "./configs/rumcnotprostatexnoclinical_folds.json"
+dataroot: "./data/raw"
+dataset_name_or_id: 236
+nnunet_preprocessed: "./work_dir_rumcnotprostatexnoclinical236/nnUNet_preprocessed"
+nnunet_raw: "./work_dir_rumcnotprostatexnoclinical236/nnUNet_raw_data_base"
+nnunet_results: "./work_dir_rumcnotprostatexnoclinical236/nnUNet_trained_models"

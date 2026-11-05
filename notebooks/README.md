@@ -3,10 +3,37 @@
 Run the Python cell notebooks from this directory (`notebooks/`); the repository
 root is assumed to be its parent.
 
+## PI-CAI clinical volume and PSA density
+
+[picai_clinical_volume.py](picai_clinical_volume.py) starts with the full PI-CAI
+marksheet and selects one examination per patient before analysis exclusions.
+Prefer exams with positive finite clinical volume and PSA, numeric PI-RADS, and
+recorded biopsy results (including negative biopsies); choose the earliest MRI
+date among complete exams, or the earliest overall if none are complete. Date
+ties use original CSV row order. Reported PSAD is optional. No later analysis
+substitutes another visit. The complete selection audit retains all 1,500 rows.
+
+The notebook measures **Bosma22b automated surrogate reference** and nnUNet274
+label-1 whole-gland volumes on their native grids in mL, retaining all 1,476
+selected patients in `comparator_volumes_all_cases.csv`. Paired comparisons use
+1,450 patients with valid clinical volume; recalculated PSA density uses 1,419.
+It reproduces volume and density agreement, paired statistics, density strata,
+reported-density diagnostics (1,032 patients), and the PI-RADS 3 biopsy simulation
+(144 patients). All 139 suspicious reporting records remain eligible. These are
+comparisons with an automated reference, not manual-reference accuracy estimates.
+
+Inputs are the [clinical marksheet](../data/raw/zenodo/picai/picai_labels/clinical_information/marksheet.csv),
+[Bosma22b masks](../data/raw/zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b/),
+and [existing nnUNet274 predictions](../results/picai_pred_pooled2_3d_fullres/).
+Run cells in order; no downloads or inference are performed. Outputs, including
+`patient_selection_audit.csv`, `cohort_audit.csv`, `cohort_flow.csv`, and the
+comparison tables and figures, go to
+[results/picai_clinical_volume](../results/picai_clinical_volume/).
+
 ## Linked PROSTATEx clinical-volume analysis
 
 [prostatex_linked_clinical_volume.py](prostatex_linked_clinical_volume.py) reconstructs
-the 190-case linked cohort, retains all clinical marksheet fields, and compares
+the 190-case linked volume-analysis cohort, retains all clinical marksheet fields, and compares
 clinical prostate volume with manual whole-gland segmentation volume in mL.
 Outputs are written to [results/prostatex_linked_volume](../results/prostatex_linked_volume/).
 
@@ -19,9 +46,35 @@ Inputs:
 - [PI-CAI clinical marksheet](../data/raw/zenodo/picai/picai_labels/clinical_information/marksheet.csv):
   clinical `prostate_volume` (mL/cc) and all other clinical fields.
 
-The cohort excludes ambiguous mappings, unmatched cases, and missing/nonpositive
-clinical volumes. PSA availability is not required. The exported linkage audit
-records exclusions.
+The top cells compute and display the cohort flow from the mapping JSON, with
+examination and unique-patient counts and exclusions relative to each preceding stage:
+
+| Stage | Examinations | Explanation |
+|---|---:|---|
+| PROSTATEx mapping JSON | 328 | 327 unique subjects; one has two mapped examinations |
+| Local manual whole-gland mask available | 194 | 134 mapped examinations lack a local mask |
+| Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
+| Matched clinical marksheet | 192 | All remaining examinations match |
+| Valid clinical volume: volume analysis | **190** | Two lack usable clinical volume |
+| PSA available: subsequent density analysis | **189** | ProstateX-0202 lacks PSA |
+
+Clinical consistency is assessed for the 181 complete valid PSA/volume/reported-PSAD
+triples. Flag **|reported PSAD − PSA / clinical volume| > 0.01 ng/mL²** for review
+only; equality passes, allowing numerical roundoff. The threshold is configurable
+and is not documented source precision. Current inputs flag **23 cases**, including
+ProstateX-0037. Missing/invalid clinical assessments have separate statuses. No review
+flag or missing reported PSAD excludes a case from volume or recalculated density
+analysis, and a flag does not establish which field, if any, is wrong.
+
+The top cells export `cohort_flow.csv`, `cohort_linkage_audit.csv`, and the complete
+190-case `clinical_consistency_audit.csv`. All 190 cases are measured once and
+retained in both `comparator_volumes_all_cases.csv` and `comparator_volumes.csv`.
+`clinical_suspicious_cases.csv` contains a compact table of every flagged case;
+`clinical_case_review.csv` preserves their complete marksheet fields, identifiers,
+paths, residuals, implied volume, manual-mask and comparator volumes and errors.
+Review records are sorted by absolute residual and printed without truncation.
+The notebook no longer generates `clinical_consistency_failed_cases.csv` or
+`clinical_excluded_cases.csv`; any older copies are stale outputs.
 
 ## Dataset274 model (`pooled2`)
 
@@ -73,7 +126,7 @@ settings above describe the exported bundle configuration.
 
 For the linked PROSTATEx notebook, use the **PROSTATEx prediction directory** and
 match by PROSTATEx ID. All 190 cases already have predictions, so no new inference
-is needed. The notebook now calculates Dataset274 label-1 whole-gland volumes in
+is needed. The notebook calculates Dataset274 and Dataset609 label-1 whole-gland volumes in
 mL on each prediction's native grid, and compares both clinical and model volumes
 against ground truth. Per-case exports include prediction paths, voxel counts,
 voxel volumes, shape agreement, and maximum affine differences. Small affine
@@ -83,14 +136,18 @@ and the figure layout are described below.
 ## Selectable volume comparators
 
 At the top of `prostatex_linked_clinical_volume.py`, set `SELECTED_COMPARATORS`
-to any nonempty subset of `clinical`, `nnunet274`, `bosma22b`, `guerbet23`,
-`heviai23`, and `yuan23`. The current default selects clinical, Dataset274 nnUNet,
-and Bosma22b. Plot labels are **Manual ellipsoid**, **External (public)** for
-Dataset274 nnUNet trained on public data external to this evaluation dataset,
-and **Internal (institutional)** for Bosma22b from the same institution.
+to any nonempty subset of `clinical`, `nnunet274`, `rumcnotprostatex609`, `bosma22b`,
+`guerbet23`, `heviai23`, and `yuan23`. The current default selects clinical,
+Dataset274 nnUNet, and Dataset609 nnUNet across all analyses. Plot labels are
+**Manual ellipsoid**, **External (multi-site)** for Dataset274, and **Internal (RUMC)**
+for Dataset609 trained on the RUMC cohort excluding PROSTATEx. Dataset609 predictions
+come from [prostatex_pred_rumcnotprostatex609_3d_fullres](../results/prostatex_pred_rumcnotprostatex609_3d_fullres/)
+and are matched by PROSTATEx ID. Both model sources validate dataset identity and
+binary label metadata before measuring whole-gland label 1. Bosma22b remains
+optional, labeled **Bosma22b**, with its own plotting style.
 Clinical volume comes from the marksheet. HeviAI23 and Yuan23 whole gland is the union of labels 1 and 2.
-All comparisons retain the same 190-case cohort; masks are measured on native
-grids without resampling. This evaluates volume accuracy, not spatial overlap.
+Volume comparisons retain all 190 cases, including suspicious records; masks are
+measured on native grids without resampling. This evaluates volume accuracy, not spatial overlap.
 
 The generic outputs replace the former hardcoded comparison outputs:
 `comparator_volumes.csv`, `comparator_summary.csv`, `comparator_agreement.png` and `.pdf`,
@@ -152,14 +209,14 @@ The same notebook continues with PSA density = PSA (ng/mL) / volume (mL), in
 Each selected comparator uses that same PSA with its own volume measurement.
 The marksheet's reported `psad` is examined separately at the end.
 
-The density audit retains all 190 volume-analysis cases. Densities are calculated
-where PSA is finite and nonnegative and the denominator is finite and positive.
-Comparisons use one shared subset with positive PSA and valid volumes for the
-reference and all selected methods. Zero PSA is excluded from comparisons because
-log axes and relative errors require positive reference density. Missing PSA or
-invalid/empty-volume predictions are audited and excluded from every method in
-this density subset. The original volume analysis retains its cohort. Current
-default inputs yield **189 density cases**, with one missing PSA.
+The density audit retains all 190 volume-analysis cases. At this step, remove only
+missing/nonfinite PSA (currently ProstateX-0202), leaving **189 density cases**.
+The eight cases with PSA but missing reported PSAD remain eligible, as do all
+suspicious records. Finite PSA must be positive and reference and selected-method
+volumes must be finite positive: unexpected nonpositive PSA or invalid/empty-volume
+predictions are audited and stop execution rather than silently shrink the cohort.
+These checks support log axes and relative errors. Nothing is imputed, and the
+volume-analysis cohort remains unchanged.
 
 The continuous summaries and agreement figures mirror the volume analysis:
 measured versus reference density, signed and relative differences, and unsmoothed
@@ -179,22 +236,38 @@ positive as density ≥ 0.10, ≥ 0.15, or ≥ 0.20 and report sensitivity, spec
 PPV, NPV, accuracy, and TP/FP/FN/TN. Undefined ratios are NaN; macro averages use
 defined components. These measure density-stratum agreement, not cancer detection.
 
+Pairwise exact McNemar tests compare correct/incorrect stratum assignments on the
+same eligible patients. Each pair uses a 2×2 table of both correct, A only correct,
+B only correct, and both incorrect. Accuracy difference is
+`100 × (accuracy A − accuracy B)` in percentage points; positive favors A.
+Two-sided p-values receive Holm correction across all selected pairs as a separate
+family from the continuous-error tests, with no omnibus gate and alpha 0.05.
+No discordant correctness assignments gives p=1. No significant difference does
+not establish equivalence. Quadratic weighted kappa remains descriptive; no
+ordinal-error tests or additional bootstrap intervals are added.
+
 New files under `results/prostatex_linked_volume/`:
 
 - `psa_density_cohort_audit.csv`, `psa_density_per_case.csv`, and `psa_density_summary.csv`.
 - `psa_density_agreement.png` / `.pdf` and `psa_density_confusion.png` / `.pdf`.
 - `psa_density_confusion.csv`, `psa_density_classification_summary.csv`,
   `psa_density_per_stratum.csv`, and `psa_density_threshold_statistics.csv`.
+- `psa_density_stratum_pairwise_statistics.csv`: paired correctness counts,
+  accuracies, accuracy differences, raw/adjusted McNemar p-values, family size,
+  alpha, and conclusions. Single-method runs replace this with an empty table
+  retaining the same columns.
 - `psa_density_pairwise_per_case.csv`, `psa_density_pairwise_counts.csv`, and
   `psa_density_pairwise_statistics.csv`. Single-method runs write empty pairwise tables.
 
 ## Reported marksheet PSA density
 
-The final cells compare reported `psad` against **PSA / clinical volume** and
+The reported-density cells use the complete 190-case volume cohort, including suspicious
+records, for separately labeled reporting diagnostics. They compare reported
+`psad` against **PSA / clinical volume** and
 **PSA / manual-mask volume**. They also compare recalculated clinical density with
 manual-mask density on the same complete cases. This subset is independent of
 prediction-method selection; current inputs provide **181 complete reported-density
-cases**. The audit retains missing/invalid reports and exclusions. Nonnegative
+cases**. The audit records missing/invalid reports separately. Nonnegative
 reported density is valid; a zero report has undefined implied volume and is
 omitted from log-density display, but remains in statistics and strata.
 
@@ -204,10 +277,11 @@ Per-case residuals decompose total disagreement:
 
 The first term measures reporting inconsistency; the second measures the density
 difference from using clinical volume with the same PSA. An absolute reporting
-residual above **0.005 ng/mL²** is flagged for inspection. This configurable band
-assumes density alone was rounded to two decimal places; source precision varies,
-and rounded PSA/volume or different source measurements can also explain residuals.
-A flag is not confirmation of a reporting error.
+residual above **0.01 ng/mL²** is flagged for inspection. This configurable band
+uses the same configured review threshold as the early clinical consistency assessment.
+Source precision varies, and rounded PSA/volume or different source measurements
+can also explain residuals. A flag is not confirmation of a reporting error and
+does not affect analysis eligibility.
 
 The final tables include signed and relative reporting residuals, volume implied
 by reported density, largest discrepancies, stratum agreement/changes, and the
@@ -221,3 +295,39 @@ and estimated columns as above.
 Outputs use `psa_density_reported_` followed by `audit.csv`, `per_case.csv`,
 `summary.csv`, `confusion.csv`, or `diagnostics.csv`; figures use `agreement`,
 `components`, and `confusion`, each as PNG and PDF. All are in the same results directory.
+
+## PI-RADS 3 biopsy-decision analysis
+
+The July 2026 PI-CAI labels update adds `lesion_PIRADS`. The notebook's final
+section parses comma-separated lesion scores and selects cases whose **maximum
+numeric PI-RADS score is 3**. It ignores missing/`N/A` entries and rejects scores
+outside integers 1–5. Cases with a PI-RADS 4/5 lesion are excluded even if another
+lesion is PI-RADS 3. Only an absent PI-RADS column triggers the full-cohort
+fallback; unavailable scores or an empty subgroup do not. Current local inputs
+yield **26 eligible cases: 5 with csPCa and 21 without**.
+
+The simulated decision recommends biopsy when **unrounded calculated PSAD is
+≥ 0.15 ng/mL²**, including equality. It evaluates manual-mask density and all
+`SELECTED_COMPARATORS` on the same patients against **`case_ISUP ≥ 2`** as the
+outcome reference. ISUP 0–1 is negative; missing, nonfinite, noninteger, or
+out-of-range ISUP values are audited and excluded. All volume cases appear in the
+audit, including missing PSA and cases outside the subgroup. Clinical review
+flags do not exclude cases, and reported marksheet PSAD is not used.
+
+Summaries report TP/FP/FN/TN, sensitivity, specificity, PPV, NPV, accuracy,
+biopsies recommended/avoided, and csPCa detected/missed. Sensitivity and the missed
+csPCa fraction use `n_cspca`; specificity uses `n_non_cspca`; PPV/NPV use
+`biopsies_recommended_n`/`biopsies_avoided_n`; accuracy and biopsy fractions use
+`n`. Fractions range from 0 to 1; undefined ratios are NaN. Confusion matrices
+have outcome rows and decision columns, showing counts and outcome-row
+percentages. Empty analyses refresh zero-count summaries and figures and write
+an empty per-case CSV.
+
+Outputs under `results/prostatex_linked_volume/` use `psa_density_biopsy_` followed
+by `audit.csv`, `per_case.csv`, `summary.csv`, and `confusion.csv`. Confusion
+figures are also saved as PNG and PDF.
+
+This is a retrospective threshold simulation. Scores mix PI-RADS v1/2/2.1, and
+the source dataset was convenience sampled; some negatives are MRI-confirmed
+without tissue sampling or follow-up. These results describe the selected cohort
+and do not establish routine-care performance or prevalence.

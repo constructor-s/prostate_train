@@ -8,6 +8,11 @@ CSV input must have a 't2' column with paths relative to the CSV file's director
 JSON input must be a fold-split file with "training"/"testing" keys (e.g.
 configs/pooled2_folds.json), each a list of {"image", "label", "id"} entries
 with paths relative to --data_root. Use --split to choose which section to run.
+
+Each invocation replaces inference_command.txt, inference_config.json, and an
+exact copy of this script (infer.py) in the output folder before input conversion
+or model initialization. These records describe the latest attempted run, even
+if it subsequently fails or --no-overwrite leaves existing predictions in place.
 """
 import os
 # Set dummy nnUNet environment variable to suppress warnings about missing environment variables. 
@@ -19,7 +24,11 @@ import argparse
 import csv
 import json
 import pathlib
+import shlex
+import shutil
+import sys
 import tempfile
+from datetime import datetime, timezone
 
 import nibabel
 import numpy as np
@@ -95,11 +104,42 @@ def main() -> None:
     input_path = pathlib.Path(args.input)
     if args.split is not None and input_path.suffix != ".json":
         parser.error("--split is only valid when --input is a fold-split JSON file")
+    if input_path.suffix == ".json" and args.split is None:
+        parser.error("--split is required when --input is a fold-split JSON file")
+
+    bundle_root = pathlib.Path(args.bundle_root) if args.bundle_root else pathlib.Path(__file__).parent.parent
+    models_dir = bundle_root / "models"
+    if not (models_dir / "fold_0").exists():
+        raise FileNotFoundError(
+            f"Expected fold_0/ not found under {models_dir}. "
+            "Check that bundle_root points to the bundle directory, not models/."
+        )
+
+    folds = (0, 1, 2, 3, 4)
+    pp_pkl = models_dir / "postprocessing.pkl"
+    output_folder = pathlib.Path(args.output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+    command = shlex.join([sys.executable, *sys.argv])
+    config = {
+        "command": command,
+        "arguments": vars(args),
+        "working_directory": str(pathlib.Path.cwd()),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "bundle_root": str(bundle_root.resolve()),
+        "folds": folds,
+        "postprocessing": str(pp_pkl.resolve()) if pp_pkl.exists() else None,
+    }
+    script_path = pathlib.Path(__file__).resolve()
+    script_copy = output_folder / "infer.py"
+    if script_path != script_copy.resolve():
+        shutil.copyfile(script_path, script_copy)
+    (output_folder / "inference_command.txt").write_text(command + "\n", encoding="utf-8")
+    (output_folder / "inference_config.json").write_text(
+        json.dumps(config, indent=2) + "\n", encoding="utf-8"
+    )
 
     _tmp_dir_ctx = None
     if input_path.suffix == ".json":
-        if args.split is None:
-            parser.error("--split is required when --input is a fold-split JSON file")
         data_root = pathlib.Path(args.data_root)
         with open(input_path) as f:
             fold_data = json.load(f)
@@ -131,14 +171,6 @@ def main() -> None:
     else:
         list_of_lists_or_source_folder = str(input_path)
 
-    bundle_root = pathlib.Path(args.bundle_root) if args.bundle_root else pathlib.Path(__file__).parent.parent
-    models_dir = bundle_root / "models"
-    if not (models_dir / "fold_0").exists():
-        raise FileNotFoundError(
-            f"Expected fold_0/ not found under {models_dir}. "
-            "Check that bundle_root points to the bundle directory, not models/."
-        )
-
     predictor = nnUNetPredictor(
         tile_step_size=args.tile_step_size,
         use_gaussian=args.use_gaussian,
@@ -147,7 +179,7 @@ def main() -> None:
     )
     predictor.initialize_from_trained_model_folder(
         str(models_dir),
-        use_folds=(0, 1, 2, 3, 4),
+        use_folds=folds,
         checkpoint_name=args.checkpoint_name,
     )
     try:
@@ -160,7 +192,6 @@ def main() -> None:
             num_processes_segmentation_export=args.num_processes_segmentation_export,
         )
 
-        pp_pkl = models_dir / "postprocessing.pkl"
         if pp_pkl.exists():
             print(f"Applying postprocessing from {pp_pkl} to {args.output_folder}")
             pp_fns, pp_fn_kwargs = load_pickle(str(pp_pkl))

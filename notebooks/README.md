@@ -331,3 +331,48 @@ This is a retrospective threshold simulation. Scores mix PI-RADS v1/2/2.1, and
 the source dataset was convenience sampled; some negatives are MRI-confirmed
 without tissue sampling or follow-up. These results describe the selected cohort
 and do not establish routine-care performance or prevalence.
+
+## Study segmentation performance
+
+[model_study_performance.py](model_study_performance.py) generates Dataset274
+five-fold ensemble inference commands and evaluates the pooled training/CV pool,
+pooled held-out test, and external manual PROSTATEx test from the configured
+manifests (currently 239, 35, and 193 scans). Cohort keys and prediction folders
+are `pooled2_train`, `pooled2_test`, and `prostatex_original_train_mapped`. Table
+labels are **pooled2 train**, **pooled2 test**, and **PROSTATEx original train
+(mapped)**. The latter describes the source cohort: all 193 cases have PI-CAI
+mappings, and they remain external test cases for Dataset274. Training-pool performance is not
+out-of-fold validation. Run the cells in order, or from the repository root:
+
+```bash
+.venv/bin/python notebooks/model_study_performance.py
+```
+
+The notebook evaluates existing masks, prints all pending inference commands, and
+asks once: `Run all commands above? [y/N]`. Enter `y` or `yes` to run the cohorts
+sequentially; any other answer or unavailable input skips inference and exports
+tables from available predictions. Complete cohorts are skipped. Commands use
+`tile_step_size=0.8`, mirroring disabled, and `--device cuda`. Subprocesses inherit the
+normal environment, with unbuffered Python output for timely logs. Existing
+predictions in incomplete cohorts are overwritten.
+The bundle uses its five-fold ensemble, final checkpoints, and saved postprocessing.
+
+Each running cohort shows a progress bar polling expected prediction files every
+second. Overwritten files count only after changing; a full bar still waits for
+inference and postprocessing to exit. Subprocess output goes to `inference.log`
+in each prediction directory. Failure stops the queue and leaves that cohort's
+metrics `NA`. Interrupting the notebook stops the launched process group.
+Evaluation shows an `Evaluating <dataset>` progress bar counting every checked
+case, including missing or invalid cases. The first evaluation identifies pending
+cohorts; a second pass refreshes tables only after an execution attempt. Declining
+approval or having complete cohorts reuses the first evaluation. Historical run
+settings are not verified.
+
+Outputs go to `results/20261105_tile0.8_nomirroring/tables/`: CSV/Markdown tables,
+per-case metrics, and a cohort audit. Mean whole-gland DSC and volume RMSE (mL)
+stay `NA` until every expected case evaluates successfully. Equal-shape masks
+are accepted with corresponding voxel-corner displacement up to **0.25 mm**;
+larger differences are rejected. Actual displacement is exported per case, and
+masks are not resampled or modified. Counts are
+evaluated/expected scans. No command files, snapshots, or completion markers are
+created by the notebook.

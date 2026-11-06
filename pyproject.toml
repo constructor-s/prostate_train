@@ -16,6 +16,7 @@ dependencies = [
   "pydicom==3.0.2",
   "pandas==2.3.3",
   "openpyxl==3.1.5",
+  "msoffcrypto-tool>=6.1.0",
   "matplotlib==3.10.9",
   "torchmetrics==1.9.0",
   "einops==0.8.2",

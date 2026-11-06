@@ -334,15 +334,33 @@ and do not establish routine-care performance or prevalence.
 
 ## Study segmentation performance
 
-[model_study_performance.py](model_study_performance.py) generates Dataset274
-five-fold ensemble inference commands and evaluates the pooled training/CV pool,
-pooled held-out test, and external manual PROSTATEx test from the configured
-manifests (currently 239, 35, and 193 scans). Cohort keys and prediction folders
-are `pooled2_train`, `pooled2_test`, and `prostatex_original_train_mapped`. Table
-labels are **pooled2 train**, **pooled2 test**, and **PROSTATEx original train
-(mapped)**. The latter describes the source cohort: all 193 cases have PI-CAI
-mappings, and they remain external test cases for Dataset274. Training-pool performance is not
-out-of-fold validation. Run the cells in order, or from the repository root:
+[model_study_performance.py](model_study_performance.py) evaluates the five-fold
+Dataset274 and Dataset236 ensembles. DSC, volume RMSE (mL), and case-count tables
+use dataset/split rows and model columns:
+
+| Dataset / manifest split | Expected scans | Dataset274 | Dataset236 |
+|---|---:|---|---|
+| pooled2 / training | 239 | Training/CV pool | Not requested |
+| pooled2 / testing | 35 | Held-out test | External test |
+| rumcnotprostatexnoclinical / training | 236 | Not requested | Training/CV pool |
+| rumcnotprostatexnoclinical / testing | 193 | External test | Held-out test |
+
+The RUMC testing split is the mapped PROSTATEx original training cohort, with
+manual whole-gland masks. RUMC training uses **Bosma22b automated surrogate
+reference masks**, so its metrics measure agreement with that automated reference.
+Training-pool performance is not out-of-fold validation. Counts are scans, not
+unique patients. Not-requested combinations remain `NA`; requested runs show
+`evaluated/expected` even when predictions are missing.
+
+The input YAMLs resolve the original split manifests and data roots. Dataset236
+uses [its bundle inference entrypoint](../bundles/Dataset236_raw_3d_fullres_5fold/scripts/infer.py)
+and [rumcnotprostatexnoclinical_input.yaml](../configs/rumcnotprostatexnoclinical_input.yaml)
+for its training/testing splits, plus [pooled2_input.yaml](../configs/pooled2_input.yaml)
+for the external testing split. Prediction folders are model-specific under the
+study root. Existing Dataset274 folders are preserved: `pooled2_train`,
+`pooled2_test`, and `prostatex_original_train_mapped`. Dataset236 uses `rumc_train`,
+`prostatex_original_train_mapped`, and `pooled2_test` under its own model directory.
+Run the cells in order, or from the repository root:
 
 ```bash
 .venv/bin/python notebooks/model_study_performance.py
@@ -355,7 +373,7 @@ tables from available predictions. Complete cohorts are skipped. Commands use
 `tile_step_size=0.8`, mirroring disabled, and `--device cuda`. Subprocesses inherit the
 normal environment, with unbuffered Python output for timely logs. Existing
 predictions in incomplete cohorts are overwritten.
-The bundle uses its five-fold ensemble, final checkpoints, and saved postprocessing.
+Each bundle uses its five-fold ensemble, final checkpoints, and saved postprocessing.
 
 Each running cohort shows a progress bar polling expected prediction files every
 second. Overwritten files count only after changing; a full bar still waits for
@@ -371,8 +389,12 @@ settings are not verified.
 Outputs go to `results/20261105_tile0.8_nomirroring/tables/`: CSV/Markdown tables,
 per-case metrics, and a cohort audit. Mean whole-gland DSC and volume RMSE (mL)
 stay `NA` until every expected case evaluates successfully. Equal-shape masks
-are accepted with corresponding voxel-corner displacement up to **0.25 mm**;
+are accepted with corresponding voxel-corner displacement up to **0.5 mm**;
 larger differences are rejected. Actual displacement is exported per case, and
-masks are not resampled or modified. Counts are
+masks are not resampled or modified. After the final evaluation pass, warning
+tables list evaluated cases with displacement greater than **1e-3 mm** and
+invalid cases with their errors. Smaller displacements remain in the per-case
+CSV. Geometry comparisons use effective affines, not other header metadata. Reports include
+model, cohort, and case ID in manifest order. Counts are
 evaluated/expected scans. No command files, snapshots, or completion markers are
 created by the notebook.

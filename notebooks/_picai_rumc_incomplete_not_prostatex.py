@@ -10,7 +10,8 @@
 # PROSTATEx cases to testing, pairing original T2 images with manual whole-gland
 # masks. Training labels remain Bosma22b AI surrogate annotations. Exclude every
 # PROSTATEx-mapped patient from training, including ambiguous links and repeats.
-# Exclude unmapped PROSTATEx identities from testing and record them in the audit.
+# Testing requires one mapped exam and a finite positive clinical ellipsoid
+# volume (mL): 190 of 193 mapped cases qualify. Record all exclusions in the audit.
 #
 # Run cells in order, or execute this file with the project Python environment.
 # Write the manifest under configs/ and selection audits under
@@ -171,7 +172,9 @@ assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_pat
 # %% [markdown]
 # ## Add manual PROSTATEx testing cases and check mapped identities
 #
-# Require a PI-CAI mapping for testing, without clinical completeness requirements.
+# Require exactly one PI-CAI mapping and a finite positive clinical ellipsoid
+# volume in mL on that patient/study marksheet row. Other clinical fields are
+# not required. Missing marksheet exams and ambiguous mappings are excluded.
 # Retain all links for ambiguous IDs when checking overlap, since
 # choosing one link could miss a shared training patient. Original PROSTATEx T2
 # images are paired with mask_prostate annotations, never PI-CAI AI labels.
@@ -179,8 +182,9 @@ assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_pat
 # %%
 testing = prostatex.sort_values('ID').copy()
 links = pd.DataFrame(
-    [(key.split('_')[0], value, int(value.split('_')[0])) for key, value in mapping.items()],
-    columns=['ID', 'picai_key', 'patient_id'],
+    [(key.split('_')[0], value, int(value.split('_')[0]), int(value.split('_')[1]))
+     for key, value in mapping.items()],
+    columns=['ID', 'picai_key', 'patient_id', 'study_id'],
 )
 testing_links = links.loc[links['ID'].isin(testing['ID'])].copy()
 assert not set(training['patient_id']) & set(testing_links['patient_id']), 'Mapped patient overlap'
@@ -190,15 +194,43 @@ testing['picai_keys'] = testing['ID'].map(linked_keys).fillna('')
 testing['mapping_count'] = testing['ID'].map(testing_links.groupby('ID').size()).fillna(0).astype(int)
 testing['linkage_status'] = np.select(
     [testing['mapping_count'].eq(0), testing['mapping_count'].gt(1)],
-    ['excluded_no_mapping', 'multiple_links_all_excluded_from_training'],
+    ['excluded_no_mapping', 'excluded_ambiguous_mapping'],
     default='mapped_patient_excluded_from_training',
 )
-testing['assignment'] = np.where(testing['mapping_count'].gt(0), 'testing', 'excluded')
+assert not marksheet.duplicated(['patient_id', 'study_id']).any(), 'Duplicate marksheet exam keys'
+unique_links = testing_links.loc[testing_links['ID'].map(testing_links.groupby('ID').size()).eq(1)]
+clinical_links = unique_links.merge(
+    marksheet[['patient_id', 'study_id', 'prostate_volume']],
+    on=['patient_id', 'study_id'], how='left', validate='many_to_one', indicator='marksheet_match',
+)
+testing = testing.merge(
+    clinical_links[['ID', 'picai_key', 'patient_id', 'study_id', 'prostate_volume', 'marksheet_match']],
+    on='ID', how='left', validate='one_to_one',
+)
+testing['has_marksheet_exam'] = testing['marksheet_match'].eq('both')
+testing['clinical_volume_ml'] = pd.to_numeric(testing['prostate_volume'], errors='coerce')
+testing['has_valid_clinical_volume'] = (
+    np.isfinite(testing['clinical_volume_ml']) & testing['clinical_volume_ml'].gt(0)
+)
+testing['testing_eligible'] = (
+    testing['mapping_count'].eq(1) & testing['has_marksheet_exam'] & testing['has_valid_clinical_volume']
+)
+testing['exclusion_reason'] = np.select(
+    [testing['mapping_count'].eq(0), testing['mapping_count'].gt(1),
+     ~testing['has_marksheet_exam'], ~testing['has_valid_clinical_volume']],
+    ['no_mapping', 'ambiguous_mapping', 'missing_marksheet_exam',
+     'missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume'],
+    default='',
+)
+testing['assignment'] = np.where(testing['testing_eligible'], 'testing', 'excluded')
 testing_audit = testing.copy()
 testing = testing.loc[testing['assignment'].eq('testing')].copy()
 assert not testing.empty, 'No mapped PROSTATEx testing cases'
-assert testing['mapping_count'].gt(0).all(), 'Unmapped testing identity'
+assert testing['mapping_count'].eq(1).all(), 'Testing requires unambiguous mapped exams'
+assert testing['has_valid_clinical_volume'].all(), 'Invalid testing clinical volume'
 display(testing_audit['linkage_status'].value_counts().rename_axis('status').to_frame('prostatex_cases'))
+display(testing_audit.loc[testing_audit['assignment'].eq('excluded'),
+                         ['ID', 'picai_keys', 'prostate_volume', 'exclusion_reason']])
 
 # %% [markdown]
 # ## Review cohort flow
@@ -206,6 +238,10 @@ display(testing_audit['linkage_status'].value_counts().rename_axis('status').to_
 # Of 792 RUMC patients, 340 have no complete exam. Excluding the 104 mapped to
 # PROSTATEx leaves 236 patients. Their 239 eligible exams supply one training
 # exam per patient; the other three exams remain excluded.
+# Of 204 locally indexed PROSTATEx cases, 11 have no mapping. Among the 193
+# mapped identities, ProstateX-0025 has two mapped exams and is excluded rather
+# than choosing a volume arbitrarily (99.5 versus 95 mL). Of the remaining 192,
+# ProstateX-0071 and ProstateX-0149 have missing volumes, leaving 190 testing cases.
 
 # %%
 no_complete = audit.loc[~audit['patient_has_complete_exam']]
@@ -219,14 +255,33 @@ flow = pd.DataFrame([
         ('PROSTATEx-mapped patients with no complete exam (excluded)', mapped_incomplete),
         ('Eligible RUMC patients before first-exam selection', eligible),
         ('Training: earliest RUMC exam per eligible patient', training),
-        ('Testing: original PROSTATEx images and manual whole-gland masks',
-         testing.rename(columns={'ID': 'patient_id'})),
     ]
 ])
+# PROSTATEx patient counts use original PROSTATEx identities (one indexed scan
+# per identity), including cases for which no PI-CAI patient can be assigned.
+testing_flow = pd.DataFrame([
+    {'stage': name, 'examinations': len(frame), 'patients': frame['ID'].nunique()}
+    for name, frame in [
+        ('PROSTATEx: locally indexed cases', testing_audit),
+        ('PROSTATEx: no mapping (excluded)', testing_audit.loc[testing_audit.mapping_count.eq(0)]),
+        ('PROSTATEx: ambiguous mapping (excluded)', testing_audit.loc[testing_audit.mapping_count.gt(1)]),
+        ('PROSTATEx: unambiguous mapped cases', testing_audit.loc[testing_audit.mapping_count.eq(1)]),
+        ('PROSTATEx: missing marksheet exam (excluded)',
+         testing_audit.loc[testing_audit.exclusion_reason.eq('missing_marksheet_exam')]),
+        ('PROSTATEx: invalid clinical volume (excluded)', testing_audit.loc[
+            testing_audit.exclusion_reason.eq('missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume')]),
+        ('Testing: clinical volume and original images/manual whole-gland masks', testing),
+    ]
+])
+flow = pd.concat([flow, testing_flow], ignore_index=True)
 assert (len(audit), audit['patient_id'].nunique()) == (800, 792), 'RUMC cohort changed'
 assert (len(no_complete), no_complete['patient_id'].nunique()) == (345, 340)
 assert (len(mapped_incomplete), mapped_incomplete['patient_id'].nunique()) == (106, 104)
 assert (len(eligible), len(training)) == (239, 236), 'RUMC training counts changed'
+assert len(testing_audit) == 204, 'Local PROSTATEx index changed'
+assert testing_audit.mapping_count.gt(0).sum() == 193, 'Mapped PROSTATEx cohort changed'
+assert testing_audit.mapping_count.eq(1).sum() == 192, 'Unambiguous PROSTATEx cohort changed'
+assert len(testing) == 190, 'Volume-eligible PROSTATEx testing count changed'
 display(flow)
 display(audit.groupby('selection_reason').agg(examinations=('ID', 'size'), patients=('patient_id', 'nunique')))
 
@@ -292,3 +347,5 @@ print(f'Wrote {MANIFEST_PATH}')
 print(f'Wrote selection_audit.csv, testing_audit.csv, and cohort_flow.csv to {OUTPUT_DIR}')
 print(f'Training: {len(entries)} RUMC exams / {training.patient_id.nunique()} patients; testing: {len(testing_entries)} manual PROSTATEx cases')
 print(f'PROSTATEx cases excluded without a PI-CAI mapping: {testing_audit.mapping_count.eq(0).sum()}')
+print('PROSTATEx testing exclusions by reason:')
+print(testing_audit.loc[testing_audit.assignment.eq('excluded'), 'exclusion_reason'].value_counts())

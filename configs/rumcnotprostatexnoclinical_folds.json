@@ -1303,11 +1303,6 @@
             "id": "ProstateX-0024"
         },
         {
-            "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0025_t2_tse_tra_4.nii.gz",
-            "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0025.nii.gz",
-            "id": "ProstateX-0025"
-        },
-        {
             "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0026_t2_tse_tra_4.nii.gz",
             "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0026.nii.gz",
             "id": "ProstateX-0026"
@@ -1511,11 +1506,6 @@
             "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0070_t2_tse_tra_4.nii.gz",
             "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0070.nii.gz",
             "id": "ProstateX-0070"
-        },
-        {
-            "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0071_t2_tse_tra_4.nii.gz",
-            "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0071.nii.gz",
-            "id": "ProstateX-0071"
         },
         {
             "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0072_t2_tse_tra_5.nii.gz",
@@ -1896,11 +1886,6 @@
             "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0147_t2_tse_tra_9.nii.gz",
             "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0147.nii.gz",
             "id": "ProstateX-0147"
-        },
-        {
-            "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0149_t2_tse_tra_9.nii.gz",
-            "label": "github/prostatex_masks/Files/prostate/mask_prostate/ProstateX-0149.nii.gz",
-            "id": "ProstateX-0149"
         },
         {
             "image": "github/prostatex_masks/Files/prostate/Images/ProstateX-0152_t2_tse_tra_9.nii.gz",

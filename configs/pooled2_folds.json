@@ -1298,6 +1298,18 @@
             "id": "prostate158_127"
         },
         {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_03"
+        },
+        {
+            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01.nii.gz",
+            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01_segmentation.nii.gz",
+            "id": "promise12_livechallenge_test_data_01"
+        }
+    ],
+    "endorectal_coil": [
+        {
             "image": "tcia/qin_prostate_repeatability/mr_nii/PCAMPMRI-00010_19950706_t2_weighted_axial.nii.gz",
             "label": "tcia/qin_prostate_repeatability/seg_nii/PCAMPMRI-00010_19950706_t2_weighted_axial_wholegland.nii.gz",
             "id": "qin_PCAMPMRI-00010_19950706"
@@ -1338,11 +1350,6 @@
             "id": "promise12_training_data_04"
         },
         {
-            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03.nii.gz",
-            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case03_segmentation.nii.gz",
-            "id": "promise12_livechallenge_test_data_03"
-        },
-        {
             "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case10.nii.gz",
             "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case10_segmentation.nii.gz",
             "id": "promise12_training_data_10"
@@ -1356,11 +1363,6 @@
             "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case48.nii.gz",
             "label": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case48_segmentation.nii.gz",
             "id": "promise12_training_data_48"
-        },
-        {
-            "image": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01.nii.gz",
-            "label": "zenodo/promise12/record-8026660/promise12/livechallenge_test_data_nii/Case01_segmentation.nii.gz",
-            "id": "promise12_livechallenge_test_data_01"
         },
         {
             "image": "zenodo/promise12/record-8026660/promise12/training_data_nii/Case41.nii.gz",

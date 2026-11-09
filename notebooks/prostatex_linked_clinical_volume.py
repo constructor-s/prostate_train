@@ -47,11 +47,12 @@ from IPython.display import display
 from matplotlib.ticker import FuncFormatter, NullFormatter
 
 # Select one or more methods; order controls display order.
-SELECTED_COMPARATORS = ['clinical', 'nnunet274', 'rumcnotprostatex609']
+SELECTED_COMPARATORS = ['clinical', 'nnunet274', 'rumcnotprostatexnoclinical236']
 COMPARATORS = {
     'clinical': ('Manual ellipsoid', None, [1]),
-    'nnunet274': ('External (multi-site)', None, [1]),
-    'rumcnotprostatex609': ('Internal (RUMC)', None, [1]),
+    'nnunet274': ('Multicenter', None, [1]),
+    'rumcnotprostatexnoclinical236': ('RUMC (same inst.)', None, [1]),
+    'rumcnotprostatex609': ('Internal (RUMC; legacy Dataset609)', None, [1]),
     'bosma22b': ('Bosma22b', 'whole_gland/AI/Bosma22b', [1]),
     'guerbet23': ('Guerbet23', 'whole_gland/AI/Guerbet23', [1]),
     'heviai23': ('HeviAI23', 'zonal_pz_tz/AI/HeviAI23', [1, 2]),
@@ -65,6 +66,7 @@ assert set(SELECTED_COMPARATORS) <= COMPARATORS.keys(), 'Unknown comparator'
 REPO_ROOT = Path(__file__).resolve().parents[1] if '__file__' in globals() else Path.cwd().resolve()
 if REPO_ROOT.name == 'notebooks':
     REPO_ROOT = REPO_ROOT.parent
+STUDY_ROOT = REPO_ROOT / 'results/20261105_tile0.8_nomirroring'
 MASK_ROOT = REPO_ROOT / 'data/raw/github/prostatex_masks'
 PICAI_ROOT = REPO_ROOT / 'data/raw/zenodo/picai/picai_labels'
 INDEX_PATH = MASK_ROOT / 'index.csv'
@@ -257,15 +259,26 @@ volumes = linked.merge(pd.DataFrame(reference_rows), on='ID', validate='one_to_o
 # ## Selected measurements on native grids
 #
 # Clinical volume is reported in the marksheet and labeled "Manual ellipsoid"
-# in this analysis. Dataset274 and Dataset609 predictions are matched by PROSTATEx
-# ID and use whole-gland label 1. PI-CAI masks are matched by patient/study ID.
+# in this analysis. Dataset274 and Dataset236 predictions come from the
+# standardized study's `prostatex_original_train_mapped` folders. Their saved
+# `inference_config.json` files document a five-fold ensemble (folds 0–4),
+# tile step 0.8, and disabled mirroring. Predictions are matched by PROSTATEx ID
+# and use whole-gland label 1. Each folder contains 193 masks; only the 190
+# eligible linked cases enter this analysis. Legacy Dataset609 remains optional
+# and uses its original prediction folder and historical inference settings.
+# PI-CAI masks are matched by patient/study ID.
 # Bosma22b and Guerbet23 use whole-gland label 1; HeviAI23 and Yuan23 use PZ=1 and TZ=2.
 # Their union is measured in memory. No resampling or spatial evaluation is
 # performed. Empty predictions remain zero-volume failures; invalid inputs stop.
 
 # %%
 MODEL_ROOTS = {
-    'nnunet274': (REPO_ROOT / 'results/prostatex_pred_pooled2_3d_fullres', 'Dataset274_raw'),
+    'nnunet274': (
+        STUDY_ROOT / 'Dataset274_raw_3d_fullres_5fold/prostatex_original_train_mapped', 'Dataset274_raw',
+    ),
+    'rumcnotprostatexnoclinical236': (
+        STUDY_ROOT / 'Dataset236_raw_3d_fullres_5fold/prostatex_original_train_mapped', 'Dataset236_raw',
+    ),
     'rumcnotprostatex609': (
         REPO_ROOT / 'results/prostatex_pred_rumcnotprostatex609_3d_fullres', 'Dataset609_raw',
     ),
@@ -360,10 +373,11 @@ assert len(volumes) >= 2, 'Fewer than two eligible volume cases'
 # %% [markdown]
 # ## Volume accuracy against manual whole-gland ground truth
 #
-# **Manual ellipsoid** is the reported clinical volume. **External (multi-site)**
-# identifies Dataset274 nnUNet. **Internal (RUMC)** identifies Dataset609 nnUNet
-# predictions from the RUMC training cohort excluding PROSTATEx. Bosma22b remains
-# available as an optional comparator under its own name.
+# **Manual ellipsoid** is the reported clinical volume. **Multicenter** identifies
+# Dataset274 nnUNet. **Internal (RUMC)** identifies Dataset236 nnUNet from the
+# `rumcnotprostatexnoclinical` training cohort. Dataset609 is retained as an
+# explicitly labeled legacy comparator. Bosma22b remains available as an optional
+# comparator under its own name.
 #
 # Positive signed errors indicate overestimation. Limits of agreement are bias
 # ± 1.96 sample SD, not confidence intervals. Rank by MAE on this linked cohort;
@@ -418,7 +432,7 @@ summary.to_csv(OUTPUT_DIR / 'comparator_summary.csv', index=False)
 # is fixed below; values outside it are clipped only in the figure.
 
 # %%
-FIGURE_SIZE = (9.5, 8.5)
+FIGURE_SIZE = (9.5, 7.5)
 VOLUME_TICKS = [10, 30, 100, 300]
 RELATIVE_DIFFERENCE_LIMITS = (-90, 90)
 
@@ -426,6 +440,7 @@ RELATIVE_DIFFERENCE_LIMITS = (-90, 90)
 PLOT_STYLES = {
     'clinical': dict(color='#4C6A85', marker='o', linestyle='-'),
     'nnunet274': dict(color='#B88254', marker='s', linestyle='--'),
+    'rumcnotprostatexnoclinical236': dict(color='#91A78C', marker='^', linestyle=':'),
     'rumcnotprostatex609': dict(color='#91A78C', marker='^', linestyle=':'),
     'bosma22b': dict(color='#7D8995', marker='X', linestyle=(0, (1, 1))),
     'guerbet23': dict(color='#806A88', marker='D', linestyle='-.'),

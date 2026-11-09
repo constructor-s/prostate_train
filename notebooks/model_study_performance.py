@@ -8,7 +8,9 @@
 # RUMC testing is the mapped PROSTATEx original training cohort (manual masks),
 # held out from both models. RUMC training uses Bosma22b automated surrogate
 # reference masks; its scores measure agreement with that automated reference.
-# pooled2 testing is external to Dataset236. Tables group rows by dataset/split;
+# pooled2 testing is external to Dataset236. The separate endorectal_coil split
+# is evaluated on both models, immediately below pooled2 testing in tables.
+# Tables group rows by dataset/split;
 # Dataset274 on RUMC training is not requested and remains NA. The clinical
 # cohort compares volumes with median manual-reader planimetry; its DSC is NA.
 #
@@ -52,21 +54,23 @@ GEOMETRY_WARNING_THRESHOLD_MM = 1e-3
 DATASETS = [
     dict(key='pooled2_train', dataset='pooled2', split='training'),
     dict(key='pooled2_test', dataset='pooled2', split='testing'),
+    dict(key='pooled2_endorectal_coil', dataset='pooled2', split='endorectal_coil'),
     dict(key='rumc_train', dataset='rumcnotprostatexnoclinical', split='training'),
     dict(key='prostatex_original_train_mapped', dataset='rumcnotprostatexnoclinical', split='testing'),
 ]
 MODELS = [
     dict(name='Dataset274_raw_3d_fullres_5fold',
-         cohort_keys=['pooled2_train', 'pooled2_test', 'prostatex_original_train_mapped']),
+         cohort_keys=['pooled2_train', 'pooled2_test', 'pooled2_endorectal_coil', 'prostatex_original_train_mapped']),
     dict(name='Dataset236_raw_3d_fullres_5fold',
-         cohort_keys=['rumc_train', 'prostatex_original_train_mapped', 'pooled2_test']),
+         cohort_keys=['rumc_train', 'prostatex_original_train_mapped', 'pooled2_test', 'pooled2_endorectal_coil']),
 ]
 
 # %% [markdown]
 # ## Cohort inputs and reproducible commands
 #
 # Read the original manifests and data roots from their input configurations.
-# Inference accepts these JSON files directly with --split training or testing.
+# Inference accepts these JSON files directly with --split training, testing,
+# or endorectal_coil.
 
 # %%
 COHORTS = []

@@ -407,6 +407,7 @@ for key in SELECTED_COMPARATORS:
         bias_ml=bias_ml,
         mae_ml=error.abs().mean(),
         rmse_ml=np.sqrt((error**2).mean()),
+        rmspe_percent=np.sqrt((relative**2).mean()),
         mean_absolute_percentage_error=relative.abs().mean(),
         pearson_r=value.corr(gt),
         loa_lower_ml=bias_ml - 1.96 * sd_ml,
@@ -586,12 +587,22 @@ if pair_tables:
     pairwise_counts.to_csv(OUTPUT_DIR / 'comparator_pairwise_counts.csv', index=False)
 
 # %% [markdown]
-# ## Paired post hoc inference: RMSE and probability of being closer
+# ## Paired post hoc inference: RMSE, RMSPE, and probability of being closer
 #
 # These are two different questions: a method can have lower population RMSE
 # without being closer on most patients. Positive RMSE improvement = RMSE(B) −
 # RMSE(A), in mL, favors A. Equality of population RMSE is equivalent to zero mean
 # paired squared-error difference, d = error(B)² − error(A)² (mL²).
+#
+# RMSPE (%) = sqrt(mean((100 × (prediction − reference) / reference)²)).
+# Each patient is normalized by their own positive reference. The same inference
+# below is applied to percentage errors for RMSPE; squared-error differences are
+# then in percent². RMSPE(B) − RMSPE(A) and its interval are in percentage points;
+# positive favors A. BCa intervals remain pointwise and unadjusted.
+# RMSPE bootstrap tests form a separate Holm family across method pairs in this
+# analysis; RMSPE t-test sensitivity p-values have their own analogous family.
+# Existing RMSE/closer families are unchanged. Zero predictions remain eligible
+# where allowed by the existing cohort rules.
 #
 # Primary RMSE inference uses a two-sided, null-centered bootstrap-t test of
 # mean(d)=0. Its null samples resample d−mean(d), not the original uncentered
@@ -647,68 +658,96 @@ for a, b in combinations(SELECTED_COMPARATORS, 2):
     error_b = (volumes[f'{b}_volume_ml'] - volumes['gt_volume_ml']).to_numpy(dtype=float)
     assert np.isfinite(error_a).all() and np.isfinite(error_b).all(), (a, b)
     n = len(error_a)
-    # Reset for each pair so reordering methods preserves the sampled patients.
-    ci_rng = np.random.default_rng(RANDOM_SEED)
-    test_rng = np.random.default_rng(RANDOM_SEED + 1)
-    improvement = float(rmse_improvement(error_a, error_b))
-    d = error_b**2 - error_a**2
-    d_mean = float(d.mean())
-    constant_d = np.ptp(d) == 0
+    reference = volumes['gt_volume_ml'].to_numpy(dtype=float)
+    assert np.isfinite(reference).all() and (reference > 0).all(), 'RMSPE requires positive finite references'
+    raw_error_a, raw_error_b = error_a, error_b
+    endpoint_statistics = {}
+    for endpoint in ['rmse', 'rmspe']:
+        error_a = raw_error_a if endpoint == 'rmse' else 100 * raw_error_a / reference
+        error_b = raw_error_b if endpoint == 'rmse' else 100 * raw_error_b / reference
+        assert np.isfinite(error_a).all() and np.isfinite(error_b).all(), (a, b, endpoint)
+        # Reset for each pair so reordering methods preserves the sampled patients.
+        ci_rng = np.random.default_rng(RANDOM_SEED)
+        test_rng = np.random.default_rng(RANDOM_SEED + 1)
+        improvement = float(rmse_improvement(error_a, error_b))
+        d = error_b**2 - error_a**2
+        d_mean = float(d.mean())
+        constant_d = np.ptp(d) == 0
 
-    # Constant per-patient squared errors give a deterministic RMSE difference.
-    # Identical squared errors also give exactly zero difference on every sample.
-    if np.all(d == 0) or (np.ptp(error_a**2) == 0 and np.ptp(error_b**2) == 0):
-        ci_lower = ci_upper = improvement
-        ci_method = 'deterministic'
-    else:
-        with warnings.catch_warnings(), np.errstate(invalid='ignore', divide='ignore'):
-            warnings.simplefilter('ignore', stats.DegenerateDataWarning)
-            bootstrap_ci = stats.bootstrap(
-                (error_a, error_b), rmse_improvement, paired=True, vectorized=True,
-                n_resamples=N_BOOTSTRAP, batch=BOOTSTRAP_BATCH, rng=ci_rng,
-                confidence_level=CONFIDENCE_LEVEL, method='BCa',
-            )
-        ci_lower, ci_upper = bootstrap_ci.confidence_interval
-        ci_method = 'paired_BCa'
-        if not np.isfinite([ci_lower, ci_upper]).all():
-            # BCa acceleration can be undefined for a degenerate jackknife.
-            ci_lower, ci_upper = np.quantile(
-                bootstrap_ci.bootstrap_distribution,
-                [(1 - CONFIDENCE_LEVEL) / 2, (1 + CONFIDENCE_LEVEL) / 2],
-            )
-            ci_method = 'paired_percentile_degenerate_BCa'
-
-    centered_d = d - d_mean
-    if constant_d:
-        # Center analytically to avoid floating-point residuals for constant d.
-        centered_d = np.zeros_like(d)
-        observed_statistic = abs(d_mean)
-        test_method = 'null_centered_bootstrap_mean_zero_variance'
-        t_pvalue = np.nan
-        t_status = 'undefined_zero_variance'
-    else:
-        observed_statistic = abs(d_mean) / (d.std(ddof=1) / np.sqrt(n))
-        test_method = 'null_centered_bootstrap_t'
-        t_pvalue = float(stats.ttest_1samp(d, popmean=0).pvalue)
-        t_status = 'defined'
-
-    extreme = 0
-    for start in range(0, N_BOOTSTRAP, BOOTSTRAP_BATCH):
-        batch_size = min(BOOTSTRAP_BATCH, N_BOOTSTRAP - start)
-        indices = test_rng.integers(0, n, size=(batch_size, n))
-        null_samples = centered_d[indices]
-        null_means = np.abs(null_samples.mean(axis=1))
-        if constant_d:
-            null_statistics = null_means
+        # Constant per-patient squared errors give a deterministic RMSE difference.
+        # Identical squared errors also give exactly zero difference on every sample.
+        if np.all(d == 0) or (np.ptp(error_a**2) == 0 and np.ptp(error_b**2) == 0):
+            ci_lower = ci_upper = improvement
+            ci_method = 'deterministic'
         else:
-            null_se = null_samples.std(axis=1, ddof=1) / np.sqrt(n)
-            # A zero-SE draw with nonzero mean has infinite |t|; 0/0 is zero.
-            null_statistics = np.divide(
-                null_means, null_se, out=np.full(batch_size, np.inf), where=null_se > 0,
+            with warnings.catch_warnings(), np.errstate(invalid='ignore', divide='ignore'):
+                warnings.simplefilter('ignore', stats.DegenerateDataWarning)
+                bootstrap_ci = stats.bootstrap(
+                    (error_a, error_b), rmse_improvement, paired=True, vectorized=True,
+                    n_resamples=N_BOOTSTRAP, batch=BOOTSTRAP_BATCH, rng=ci_rng,
+                    confidence_level=CONFIDENCE_LEVEL, method='BCa',
+                )
+            ci_lower, ci_upper = bootstrap_ci.confidence_interval
+            ci_method = 'paired_BCa'
+            if not np.isfinite([ci_lower, ci_upper]).all():
+                # BCa acceleration can be undefined for a degenerate jackknife.
+                ci_lower, ci_upper = np.quantile(
+                    bootstrap_ci.bootstrap_distribution,
+                    [(1 - CONFIDENCE_LEVEL) / 2, (1 + CONFIDENCE_LEVEL) / 2],
+                )
+                ci_method = 'paired_percentile_degenerate_BCa'
+
+        centered_d = d - d_mean
+        if constant_d:
+            # Center analytically to avoid floating-point residuals for constant d.
+            centered_d = np.zeros_like(d)
+            observed_statistic = abs(d_mean)
+            test_method = 'null_centered_bootstrap_mean_zero_variance'
+            t_pvalue = np.nan
+            t_status = 'undefined_zero_variance'
+        else:
+            observed_statistic = abs(d_mean) / (d.std(ddof=1) / np.sqrt(n))
+            test_method = 'null_centered_bootstrap_t'
+            t_pvalue = float(stats.ttest_1samp(d, popmean=0).pvalue)
+            t_status = 'defined'
+
+        extreme = 0
+        for start in range(0, N_BOOTSTRAP, BOOTSTRAP_BATCH):
+            batch_size = min(BOOTSTRAP_BATCH, N_BOOTSTRAP - start)
+            indices = test_rng.integers(0, n, size=(batch_size, n))
+            null_samples = centered_d[indices]
+            null_means = np.abs(null_samples.mean(axis=1))
+            if constant_d:
+                null_statistics = null_means
+            else:
+                null_se = null_samples.std(axis=1, ddof=1) / np.sqrt(n)
+                # A zero-SE draw with nonzero mean has infinite |t|; 0/0 is zero.
+                null_statistics = np.divide(
+                    null_means, null_se, out=np.full(batch_size, np.inf), where=null_se > 0,
+                )
+                null_statistics[(null_se == 0) & (null_means == 0)] = 0
+            extreme += int(np.count_nonzero(null_statistics >= observed_statistic))
+        bootstrap_pvalue = (extreme + 1) / (N_BOOTSTRAP + 1)
+
+        if endpoint == 'rmse':
+            endpoint_statistics.update(
+                rmse_a_ml=float(np.sqrt(np.mean(error_a**2))),
+                rmse_b_ml=float(np.sqrt(np.mean(error_b**2))), rmse_improvement_ml=improvement,
+                rmse_improvement_ci_lower_ml=float(ci_lower), rmse_improvement_ci_upper_ml=float(ci_upper),
+                rmse_ci_method=ci_method, mean_squared_error_improvement_ml2=d_mean,
+                rmse_test_method=test_method, rmse_bootstrap_p=bootstrap_pvalue,
+                rmse_t_sensitivity_p=t_pvalue, rmse_t_sensitivity_status=t_status,
             )
-            null_statistics[(null_se == 0) & (null_means == 0)] = 0
-        extreme += int(np.count_nonzero(null_statistics >= observed_statistic))
-    bootstrap_pvalue = (extreme + 1) / (N_BOOTSTRAP + 1)
+        elif endpoint == 'rmspe':
+            endpoint_statistics.update(
+                rmspe_a_percent=float(np.sqrt(np.mean(error_a**2))),
+                rmspe_b_percent=float(np.sqrt(np.mean(error_b**2))), rmspe_improvement_pp=improvement,
+                rmspe_improvement_ci_lower_pp=float(ci_lower), rmspe_improvement_ci_upper_pp=float(ci_upper),
+                rmspe_ci_method=ci_method, mean_squared_error_improvement_percent2=d_mean,
+                rmspe_test_method=test_method, rmspe_bootstrap_p=bootstrap_pvalue,
+                rmspe_t_sensitivity_p=t_pvalue, rmspe_t_sensitivity_status=t_status,
+            )
+    error_a, error_b = raw_error_a, raw_error_b
 
     absolute_improvement = np.abs(error_b) - np.abs(error_a)
     wins = int(np.count_nonzero(absolute_improvement > 0))
@@ -728,12 +767,7 @@ for a, b in combinations(SELECTED_COMPARATORS, 2):
 
     statistics_rows.append(dict(
         method_a=a, name_a=COMPARATORS[a][0], method_b=b, name_b=COMPARATORS[b][0],
-        n=n, rmse_a_ml=float(np.sqrt(np.mean(error_a**2))),
-        rmse_b_ml=float(np.sqrt(np.mean(error_b**2))), rmse_improvement_ml=improvement,
-        rmse_improvement_ci_lower_ml=float(ci_lower), rmse_improvement_ci_upper_ml=float(ci_upper),
-        rmse_ci_method=ci_method, mean_squared_error_improvement_ml2=d_mean,
-        rmse_test_method=test_method, rmse_bootstrap_p=bootstrap_pvalue,
-        rmse_t_sensitivity_p=t_pvalue, rmse_t_sensitivity_status=t_status,
+        n=n, **endpoint_statistics,
         wins_a=wins, losses_a=losses, ties=ties, n_non_ties=non_ties,
         win_proportion_all=wins / n, loss_proportion_all=losses / n, tie_proportion_all=ties / n,
         probability_a_closer_given_no_tie=probability,
@@ -760,7 +794,19 @@ if not pairwise_statistics.empty:
         np.isfinite(sensitivity_p[:, 0]), sensitivity_adjusted[:, 0], np.nan,
     )
     pairwise_statistics['closer_exact_p_holm_sensitivity'] = sensitivity_adjusted[:, 1]
+    # RMSPE is its own family across method pairs, separate from RMSE/closer.
+    pairwise_statistics['rmspe_holm_family_size'] = len(pairwise_statistics)
+    pairwise_statistics['rmspe_bootstrap_p_holm'] = multipletests(
+        pairwise_statistics['rmspe_bootstrap_p'], method='holm',
+    )[1]
+    rmspe_t_p = pairwise_statistics['rmspe_t_sensitivity_p'].to_numpy()
+    rmspe_t_adjusted = multipletests(np.nan_to_num(rmspe_t_p, nan=1.0), method='holm')[1]
+    pairwise_statistics['rmspe_t_sensitivity_p_holm'] = np.where(
+        np.isfinite(rmspe_t_p), rmspe_t_adjusted, np.nan,
+    )
     for endpoint, p_column, effect_column in [
+        ('rmspe', 'rmspe_bootstrap_p_holm', 'rmspe_improvement_pp'),
+        ('rmspe_t_sensitivity', 'rmspe_t_sensitivity_p_holm', 'rmspe_improvement_pp'),
         ('rmse', 'rmse_bootstrap_p_holm', 'rmse_improvement_ml'),
         ('closer', 'closer_exact_p_holm', 'probability_a_closer_given_no_tie'),
         ('rmse_t_sensitivity', 'rmse_t_sensitivity_p_holm', 'rmse_improvement_ml'),
@@ -780,6 +826,12 @@ if not pairwise_statistics.empty:
             'method_a', 'method_b', 'n', 'rmse_improvement_ml',
             'rmse_improvement_ci_lower_ml', 'rmse_improvement_ci_upper_ml',
             'rmse_bootstrap_p_holm', 'rmse_t_sensitivity_p_holm', 'rmse_conclusion',
+        ]])
+        print('RMSPE improvement in percentage points: positive favors A. Separate Holm family.')
+        display(pairwise_statistics[[
+            'method_a', 'method_b', 'n', 'rmspe_a_percent', 'rmspe_b_percent',
+            'rmspe_improvement_pp', 'rmspe_improvement_ci_lower_pp', 'rmspe_improvement_ci_upper_pp',
+            'rmspe_bootstrap_p_holm', 'rmspe_t_sensitivity_p_holm', 'rmspe_conclusion',
         ]])
         print('Probability A is closer, conditional on no tie. Exact intervals are unadjusted.')
         display(pairwise_statistics[[
@@ -868,6 +920,7 @@ for key in SELECTED_COMPARATORS:
     psad_summary_rows.append(dict(
         method=key, name=COMPARATORS[key][0], n=len(psad_cases), density_unit=PSAD_UNIT,
         bias_psad=bias, mae_psad=error.abs().mean(), rmse_psad=np.sqrt((error**2).mean()),
+        rmspe_percent=np.sqrt((relative**2).mean()),
         mean_absolute_percentage_error=relative.abs().mean(),
         pearson_r=psad_values[key].corr(psad_gt)
         if psad_values[key].nunique() > 1 and psad_gt.nunique() > 1 else np.nan,
@@ -1214,12 +1267,22 @@ else:
     )
 
 # %% [markdown]
-# ## PSA density: paired post hoc inference: RMSE and probability of being closer
+# ## PSA density: paired post hoc inference: RMSE, RMSPE, and probability of being closer
 #
 # These are two different questions: a method can have lower population RMSE
 # without being closer on most patients. Positive RMSE improvement = RMSE(B) −
 # RMSE(A), in ng/mL², favors A. Equality of population RMSE is equivalent to zero mean
 # paired squared-error difference, d = error(B)² − error(A)² ((ng/mL²)²).
+#
+# RMSPE (%) = sqrt(mean((100 × (prediction − reference) / reference)²)).
+# Each patient is normalized by their own positive reference. The same inference
+# below is applied to percentage errors for RMSPE; squared-error differences are
+# then in percent². RMSPE(B) − RMSPE(A) and its interval are in percentage points;
+# positive favors A. BCa intervals remain pointwise and unadjusted.
+# RMSPE bootstrap tests form a separate Holm family across method pairs in this
+# analysis; RMSPE t-test sensitivity p-values have their own analogous family.
+# Existing RMSE/closer families are unchanged. Zero predictions remain eligible
+# where allowed by the existing cohort rules.
 #
 # Primary RMSE inference uses a two-sided, null-centered bootstrap-t test of
 # mean(d)=0. Its null samples resample d−mean(d), not the original uncentered
@@ -1277,68 +1340,96 @@ for a, b in combinations(SELECTED_COMPARATORS, 2):
     error_b = (psad_cases[f'{b}_psad'] - psad_cases['gt_psad']).to_numpy(dtype=float)
     assert np.isfinite(error_a).all() and np.isfinite(error_b).all(), (a, b)
     n = len(error_a)
-    # Reset for each pair so reordering methods preserves the sampled patients.
-    ci_rng = np.random.default_rng(RANDOM_SEED)
-    test_rng = np.random.default_rng(RANDOM_SEED + 1)
-    improvement = float(psad_rmse_improvement(error_a, error_b))
-    d = error_b**2 - error_a**2
-    d_mean = float(d.mean())
-    constant_d = np.ptp(d) == 0
+    reference = psad_cases['gt_psad'].to_numpy(dtype=float)
+    assert np.isfinite(reference).all() and (reference > 0).all(), 'RMSPE requires positive finite references'
+    raw_error_a, raw_error_b = error_a, error_b
+    endpoint_statistics = {}
+    for endpoint in ['rmse', 'rmspe']:
+        error_a = raw_error_a if endpoint == 'rmse' else 100 * raw_error_a / reference
+        error_b = raw_error_b if endpoint == 'rmse' else 100 * raw_error_b / reference
+        assert np.isfinite(error_a).all() and np.isfinite(error_b).all(), (a, b, endpoint)
+        # Reset for each pair so reordering methods preserves the sampled patients.
+        ci_rng = np.random.default_rng(RANDOM_SEED)
+        test_rng = np.random.default_rng(RANDOM_SEED + 1)
+        improvement = float(psad_rmse_improvement(error_a, error_b))
+        d = error_b**2 - error_a**2
+        d_mean = float(d.mean())
+        constant_d = np.ptp(d) == 0
 
-    # Constant per-patient squared errors give a deterministic RMSE difference.
-    # Identical squared errors also give exactly zero difference on every sample.
-    if np.all(d == 0) or (np.ptp(error_a**2) == 0 and np.ptp(error_b**2) == 0):
-        ci_lower = ci_upper = improvement
-        ci_method = 'deterministic'
-    else:
-        with warnings.catch_warnings(), np.errstate(invalid='ignore', divide='ignore'):
-            warnings.simplefilter('ignore', stats.DegenerateDataWarning)
-            bootstrap_ci = stats.bootstrap(
-                (error_a, error_b), psad_rmse_improvement, paired=True, vectorized=True,
-                n_resamples=N_BOOTSTRAP, batch=BOOTSTRAP_BATCH, rng=ci_rng,
-                confidence_level=CONFIDENCE_LEVEL, method='BCa',
-            )
-        ci_lower, ci_upper = bootstrap_ci.confidence_interval
-        ci_method = 'paired_BCa'
-        if not np.isfinite([ci_lower, ci_upper]).all():
-            # BCa acceleration can be undefined for a degenerate jackknife.
-            ci_lower, ci_upper = np.quantile(
-                bootstrap_ci.bootstrap_distribution,
-                [(1 - CONFIDENCE_LEVEL) / 2, (1 + CONFIDENCE_LEVEL) / 2],
-            )
-            ci_method = 'paired_percentile_degenerate_BCa'
-
-    centered_d = d - d_mean
-    if constant_d:
-        # Center analytically to avoid floating-point residuals for constant d.
-        centered_d = np.zeros_like(d)
-        observed_statistic = abs(d_mean)
-        test_method = 'null_centered_bootstrap_mean_zero_variance'
-        t_pvalue = np.nan
-        t_status = 'undefined_zero_variance'
-    else:
-        observed_statistic = abs(d_mean) / (d.std(ddof=1) / np.sqrt(n))
-        test_method = 'null_centered_bootstrap_t'
-        t_pvalue = float(stats.ttest_1samp(d, popmean=0).pvalue)
-        t_status = 'defined'
-
-    extreme = 0
-    for start in range(0, N_BOOTSTRAP, BOOTSTRAP_BATCH):
-        batch_size = min(BOOTSTRAP_BATCH, N_BOOTSTRAP - start)
-        indices = test_rng.integers(0, n, size=(batch_size, n))
-        null_samples = centered_d[indices]
-        null_means = np.abs(null_samples.mean(axis=1))
-        if constant_d:
-            null_statistics = null_means
+        # Constant per-patient squared errors give a deterministic RMSE difference.
+        # Identical squared errors also give exactly zero difference on every sample.
+        if np.all(d == 0) or (np.ptp(error_a**2) == 0 and np.ptp(error_b**2) == 0):
+            ci_lower = ci_upper = improvement
+            ci_method = 'deterministic'
         else:
-            null_se = null_samples.std(axis=1, ddof=1) / np.sqrt(n)
-            # A zero-SE draw with nonzero mean has infinite |t|; 0/0 is zero.
-            null_statistics = np.divide(
-                null_means, null_se, out=np.full(batch_size, np.inf), where=null_se > 0,
+            with warnings.catch_warnings(), np.errstate(invalid='ignore', divide='ignore'):
+                warnings.simplefilter('ignore', stats.DegenerateDataWarning)
+                bootstrap_ci = stats.bootstrap(
+                    (error_a, error_b), psad_rmse_improvement, paired=True, vectorized=True,
+                    n_resamples=N_BOOTSTRAP, batch=BOOTSTRAP_BATCH, rng=ci_rng,
+                    confidence_level=CONFIDENCE_LEVEL, method='BCa',
+                )
+            ci_lower, ci_upper = bootstrap_ci.confidence_interval
+            ci_method = 'paired_BCa'
+            if not np.isfinite([ci_lower, ci_upper]).all():
+                # BCa acceleration can be undefined for a degenerate jackknife.
+                ci_lower, ci_upper = np.quantile(
+                    bootstrap_ci.bootstrap_distribution,
+                    [(1 - CONFIDENCE_LEVEL) / 2, (1 + CONFIDENCE_LEVEL) / 2],
+                )
+                ci_method = 'paired_percentile_degenerate_BCa'
+
+        centered_d = d - d_mean
+        if constant_d:
+            # Center analytically to avoid floating-point residuals for constant d.
+            centered_d = np.zeros_like(d)
+            observed_statistic = abs(d_mean)
+            test_method = 'null_centered_bootstrap_mean_zero_variance'
+            t_pvalue = np.nan
+            t_status = 'undefined_zero_variance'
+        else:
+            observed_statistic = abs(d_mean) / (d.std(ddof=1) / np.sqrt(n))
+            test_method = 'null_centered_bootstrap_t'
+            t_pvalue = float(stats.ttest_1samp(d, popmean=0).pvalue)
+            t_status = 'defined'
+
+        extreme = 0
+        for start in range(0, N_BOOTSTRAP, BOOTSTRAP_BATCH):
+            batch_size = min(BOOTSTRAP_BATCH, N_BOOTSTRAP - start)
+            indices = test_rng.integers(0, n, size=(batch_size, n))
+            null_samples = centered_d[indices]
+            null_means = np.abs(null_samples.mean(axis=1))
+            if constant_d:
+                null_statistics = null_means
+            else:
+                null_se = null_samples.std(axis=1, ddof=1) / np.sqrt(n)
+                # A zero-SE draw with nonzero mean has infinite |t|; 0/0 is zero.
+                null_statistics = np.divide(
+                    null_means, null_se, out=np.full(batch_size, np.inf), where=null_se > 0,
+                )
+                null_statistics[(null_se == 0) & (null_means == 0)] = 0
+            extreme += int(np.count_nonzero(null_statistics >= observed_statistic))
+        bootstrap_pvalue = (extreme + 1) / (N_BOOTSTRAP + 1)
+
+        if endpoint == 'rmse':
+            endpoint_statistics.update(
+                rmse_a_psad=float(np.sqrt(np.mean(error_a**2))),
+                rmse_b_psad=float(np.sqrt(np.mean(error_b**2))), rmse_improvement_psad=improvement,
+                rmse_improvement_ci_lower_psad=float(ci_lower), rmse_improvement_ci_upper_psad=float(ci_upper),
+                rmse_ci_method=ci_method, mean_squared_error_improvement_psad2=d_mean,
+                rmse_test_method=test_method, rmse_bootstrap_p=bootstrap_pvalue,
+                rmse_t_sensitivity_p=t_pvalue, rmse_t_sensitivity_status=t_status,
             )
-            null_statistics[(null_se == 0) & (null_means == 0)] = 0
-        extreme += int(np.count_nonzero(null_statistics >= observed_statistic))
-    bootstrap_pvalue = (extreme + 1) / (N_BOOTSTRAP + 1)
+        elif endpoint == 'rmspe':
+            endpoint_statistics.update(
+                rmspe_a_percent=float(np.sqrt(np.mean(error_a**2))),
+                rmspe_b_percent=float(np.sqrt(np.mean(error_b**2))), rmspe_improvement_pp=improvement,
+                rmspe_improvement_ci_lower_pp=float(ci_lower), rmspe_improvement_ci_upper_pp=float(ci_upper),
+                rmspe_ci_method=ci_method, mean_squared_error_improvement_percent2=d_mean,
+                rmspe_test_method=test_method, rmspe_bootstrap_p=bootstrap_pvalue,
+                rmspe_t_sensitivity_p=t_pvalue, rmspe_t_sensitivity_status=t_status,
+            )
+    error_a, error_b = raw_error_a, raw_error_b
 
     absolute_improvement = np.abs(error_b) - np.abs(error_a)
     wins = int(np.count_nonzero(absolute_improvement > 0))
@@ -1358,12 +1449,7 @@ for a, b in combinations(SELECTED_COMPARATORS, 2):
 
     psad_statistics_rows.append(dict(
         method_a=a, name_a=COMPARATORS[a][0], method_b=b, name_b=COMPARATORS[b][0],
-        n=n, rmse_a_psad=float(np.sqrt(np.mean(error_a**2))),
-        rmse_b_psad=float(np.sqrt(np.mean(error_b**2))), rmse_improvement_psad=improvement,
-        rmse_improvement_ci_lower_psad=float(ci_lower), rmse_improvement_ci_upper_psad=float(ci_upper),
-        rmse_ci_method=ci_method, mean_squared_error_improvement_psad2=d_mean,
-        rmse_test_method=test_method, rmse_bootstrap_p=bootstrap_pvalue,
-        rmse_t_sensitivity_p=t_pvalue, rmse_t_sensitivity_status=t_status,
+        n=n, **endpoint_statistics,
         wins_a=wins, losses_a=losses, ties=ties, n_non_ties=non_ties,
         win_proportion_all=wins / n, loss_proportion_all=losses / n, tie_proportion_all=ties / n,
         probability_a_closer_given_no_tie=probability,
@@ -1390,7 +1476,19 @@ if not psad_pairwise_statistics.empty:
         np.isfinite(sensitivity_p[:, 0]), sensitivity_adjusted[:, 0], np.nan,
     )
     psad_pairwise_statistics['closer_exact_p_holm_sensitivity'] = sensitivity_adjusted[:, 1]
+    # RMSPE is its own family across method pairs, separate from RMSE/closer.
+    psad_pairwise_statistics['rmspe_holm_family_size'] = len(psad_pairwise_statistics)
+    psad_pairwise_statistics['rmspe_bootstrap_p_holm'] = multipletests(
+        psad_pairwise_statistics['rmspe_bootstrap_p'], method='holm',
+    )[1]
+    rmspe_t_p = psad_pairwise_statistics['rmspe_t_sensitivity_p'].to_numpy()
+    rmspe_t_adjusted = multipletests(np.nan_to_num(rmspe_t_p, nan=1.0), method='holm')[1]
+    psad_pairwise_statistics['rmspe_t_sensitivity_p_holm'] = np.where(
+        np.isfinite(rmspe_t_p), rmspe_t_adjusted, np.nan,
+    )
     for endpoint, p_column, effect_column in [
+        ('rmspe', 'rmspe_bootstrap_p_holm', 'rmspe_improvement_pp'),
+        ('rmspe_t_sensitivity', 'rmspe_t_sensitivity_p_holm', 'rmspe_improvement_pp'),
         ('rmse', 'rmse_bootstrap_p_holm', 'rmse_improvement_psad'),
         ('closer', 'closer_exact_p_holm', 'probability_a_closer_given_no_tie'),
         ('rmse_t_sensitivity', 'rmse_t_sensitivity_p_holm', 'rmse_improvement_psad'),
@@ -1410,6 +1508,12 @@ if not psad_pairwise_statistics.empty:
             'method_a', 'method_b', 'n', 'rmse_improvement_psad',
             'rmse_improvement_ci_lower_psad', 'rmse_improvement_ci_upper_psad',
             'rmse_bootstrap_p_holm', 'rmse_t_sensitivity_p_holm', 'rmse_conclusion',
+        ]])
+        print('RMSPE improvement in percentage points: positive favors A. Separate Holm family.')
+        display(psad_pairwise_statistics[[
+            'method_a', 'method_b', 'n', 'rmspe_a_percent', 'rmspe_b_percent',
+            'rmspe_improvement_pp', 'rmspe_improvement_ci_lower_pp', 'rmspe_improvement_ci_upper_pp',
+            'rmspe_bootstrap_p_holm', 'rmspe_t_sensitivity_p_holm', 'rmspe_conclusion',
         ]])
         print('Probability A is closer, conditional on no tie. Exact intervals are unadjusted.')
         display(psad_pairwise_statistics[[

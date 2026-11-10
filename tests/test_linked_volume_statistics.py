@@ -23,15 +23,16 @@ CORRECTION_SOURCE = STATISTICS_SOURCE[STATISTICS_SOURCE.index('pairwise_statisti
 
 
 class LinkedVolumeStatisticsTests(unittest.TestCase):
-    def run_statistics(self, errors, selected=None, patient_ids=None):
+    def run_statistics(self, errors, selected=None, patient_ids=None, references=None):
         selected = list(errors) if selected is None else selected
         n = len(next(iter(errors.values())))
+        references = np.full(n, 50.) if references is None else np.asarray(references)
         volumes = pd.DataFrame({
             'patient_id': np.arange(n) if patient_ids is None else patient_ids,
-            'gt_volume_ml': np.full(n, 50.0),
+            'gt_volume_ml': references,
         })
         for key, error in errors.items():
-            volumes[f'{key}_volume_ml'] = 50.0 + np.asarray(error, dtype=float)
+            volumes[f'{key}_volume_ml'] = references + np.asarray(error, dtype=float)
         tree = ast.parse(STATISTICS_SOURCE)
         # Exercise production code with a smaller, reproducible validation budget.
         for node in tree.body:
@@ -52,6 +53,9 @@ class LinkedVolumeStatisticsTests(unittest.TestCase):
             result = namespace['pairwise_statistics']
             exported = pd.read_csv(Path(directory) / 'comparator_pairwise_statistics.csv')
             self.assertEqual(result.shape, exported.shape)
+            if not result.empty:
+                np.testing.assert_allclose(exported.rmspe_improvement_pp, result.rmspe_improvement_pp)
+                np.testing.assert_allclose(exported.rmspe_bootstrap_p_holm, result.rmspe_bootstrap_p_holm)
             return result
 
     def test_identical_methods_are_uninformative(self):
@@ -143,6 +147,9 @@ class LinkedVolumeStatisticsTests(unittest.TestCase):
         rows = []
         for bootstrap_p, sign_p, t_p in [(0.01, 0.04, 0.01), (0.03, 0.001, np.nan), (0.2, 0.9, 0.2)]:
             rows.append(dict(method_a='a', method_b='b', n=20,
+                             rmspe_bootstrap_p=bootstrap_p, rmspe_t_sensitivity_p=t_p,
+                             rmspe_improvement_pp=1, rmspe_a_percent=2, rmspe_b_percent=3,
+                             rmspe_improvement_ci_lower_pp=0, rmspe_improvement_ci_upper_pp=2,
                              rmse_bootstrap_p=bootstrap_p, closer_exact_p=sign_p,
                              rmse_t_sensitivity_p=t_p, rmse_improvement_ml=1,
                              rmse_improvement_ci_lower_ml=0, rmse_improvement_ci_upper_ml=2,
@@ -167,6 +174,89 @@ class LinkedVolumeStatisticsTests(unittest.TestCase):
             self.run_statistics({'a': np.ones(10), 'b': np.full(10, 2)}, patient_ids=np.zeros(10))
         with self.assertRaises(AssertionError):
             self.run_statistics({'a': np.ones(10), 'b': np.full(10, np.nan)})
+
+
+
+    def test_volume_summary_rmspe_and_zero_prediction(self):
+        summary_source = SOURCE[SOURCE.index("gt = volumes['gt_volume_ml']"):
+                                SOURCE.index('# %% [markdown]\n# ## Agreement plots')]
+        volumes = pd.DataFrame(dict(gt_volume_ml=[10., 100.], a_volume_ml=[0., 110.]))
+        with tempfile.TemporaryDirectory() as directory:
+            ns = dict(np=np, pd=pd, volumes=volumes, SELECTED_COMPARATORS=['a'],
+                      COMPARATORS={'a': ('A', None)}, OUTPUT_DIR=Path(directory), display=lambda value: None)
+            with redirect_stdout(StringIO()):
+                exec(compile(summary_source, str(NOTEBOOK), 'exec'), ns)
+            expected = np.sqrt((100**2 + 10**2) / 2)
+            self.assertAlmostEqual(ns['summary'].iloc[0].rmspe_percent, expected)
+            self.assertAlmostEqual(pd.read_csv(Path(directory) / 'comparator_summary.csv').iloc[0].rmspe_percent,
+                                   expected)
+        row = self.run_statistics(dict(a=[-10., 10.], b=[0., 0.]), references=[10., 100.]).iloc[0]
+        self.assertEqual(row.n, 2)
+        self.assertAlmostEqual(row.rmspe_a_percent, expected)
+
+    def test_rmspe_variable_references_and_pairing(self):
+        from scipy import stats
+
+        references = np.linspace(20., 200., 30)
+        errors = np.linspace(.5, 4.5, 30)
+        row = self.run_statistics(dict(a=errors, b=2 * errors), references=references).iloc[0]
+        percent = 100 * errors / references
+        expected = stats.bootstrap(
+            (percent,), lambda x, axis: np.sqrt(np.mean(x**2, axis=axis)),
+            vectorized=True, n_resamples=1999, batch=113,
+            rng=np.random.default_rng(20261102), method='BCa',
+        ).confidence_interval
+        self.assertAlmostEqual(row.rmspe_a_percent, np.sqrt(np.mean(percent**2)))
+        self.assertAlmostEqual(row.rmspe_b_percent, 2 * row.rmspe_a_percent)
+        self.assertAlmostEqual(row.rmspe_improvement_pp, row.rmspe_a_percent)
+        np.testing.assert_allclose(
+            [row.rmspe_improvement_ci_lower_pp, row.rmspe_improvement_ci_upper_pp], expected,
+        )
+        reverse = self.run_statistics(dict(b=2 * errors, a=errors), references=references).iloc[0]
+        self.assertAlmostEqual(row.rmspe_improvement_pp, -reverse.rmspe_improvement_pp)
+        self.assertAlmostEqual(row.rmspe_improvement_ci_lower_pp, -reverse.rmspe_improvement_ci_upper_pp)
+        self.assertEqual(row.rmspe_bootstrap_p, reverse.rmspe_bootstrap_p)
+
+    def test_rmspe_and_rmse_can_favor_different_methods(self):
+        references = np.tile([10., 100.], 20)
+        row = self.run_statistics(
+            dict(a=np.tile([5., 0.], 20), b=np.tile([0., 10.], 20)), references=references,
+        ).iloc[0]
+        self.assertGreater(row.rmse_improvement_ml, 0)
+        self.assertLess(row.rmspe_improvement_pp, 0)
+
+    def test_rmspe_separate_holm_families_and_reproducibility(self):
+        from statsmodels.stats.multitest import multipletests
+
+        errors = dict(a=np.linspace(.2, 2, 30), b=np.linspace(3, 15, 30), c=np.linspace(5, 20, 30))
+        result = self.run_statistics(errors)
+        pd.testing.assert_frame_equal(result, self.run_statistics(errors))
+        self.assertTrue(result.rmspe_holm_family_size.eq(3).all())
+        self.assertTrue(result.holm_family_size.eq(6).all())
+        np.testing.assert_allclose(result.rmspe_bootstrap_p_holm,
+                                   multipletests(result.rmspe_bootstrap_p, method='holm')[1])
+        np.testing.assert_allclose(result.rmspe_t_sensitivity_p_holm,
+                                   multipletests(result.rmspe_t_sensitivity_p, method='holm')[1])
+        expected = multipletests(result[['rmse_bootstrap_p', 'closer_exact_p']].to_numpy().ravel(),
+                                method='holm')[1].reshape(-1, 2)
+        np.testing.assert_allclose(result[['rmse_bootstrap_p_holm', 'closer_exact_p_holm']], expected)
+
+    def test_rmspe_degenerate_errors_and_invalid_references(self):
+        row = self.run_statistics(dict(a=np.ones(20), b=np.full(20, 2)), references=np.full(20, 100.)).iloc[0]
+        self.assertEqual(row.rmspe_improvement_pp, 1)
+        self.assertEqual(row.rmspe_improvement_ci_lower_pp, 1)
+        self.assertEqual(row.rmspe_improvement_ci_upper_pp, 1)
+        self.assertEqual(row.rmspe_ci_method, 'deterministic')
+        self.assertAlmostEqual(row.rmspe_bootstrap_p, 1 / 2000)
+        self.assertTrue(np.isnan(row.rmspe_t_sensitivity_p_holm))
+        self.assertEqual(row.rmspe_t_sensitivity_conclusion, 'undefined')
+        tied = self.run_statistics(dict(a=np.ones(20), b=np.ones(20))).iloc[0]
+        self.assertEqual(tied.rmspe_improvement_pp, 0)
+        self.assertEqual(tied.rmspe_bootstrap_p, 1)
+        self.assertTrue(self.run_statistics(dict(a=np.ones(20))).empty)
+        for invalid in [0., -1., np.nan, np.inf]:
+            with self.subTest(reference=invalid), self.assertRaises(AssertionError):
+                self.run_statistics(dict(a=np.ones(20), b=np.full(20, 2)), references=np.full(20, invalid))
 
 
 if __name__ == '__main__':

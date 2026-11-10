@@ -91,6 +91,10 @@ class LinkedPSADensityTests(unittest.TestCase):
         self.assertTrue(cases.loc[1, 'beyond_reporting_tolerance'])
         self.assertEqual(len(namespace['volumes']), 6)
         self.assertTrue(namespace['psad_summary']['n'].eq(3).all())
+        for key in namespace['SELECTED_COMPARATORS']:
+            percent = 100 * (cases[f'{key}_psad'] - cases.gt_psad) / cases.gt_psad
+            actual = namespace['psad_summary'].set_index('method').loc[key, 'rmspe_percent']
+            self.assertAlmostEqual(actual, np.sqrt(np.mean(percent**2)))
         exported = pd.read_csv(self.output / 'psa_density_cohort_audit.csv')
         self.assertEqual(len(exported), 6)
         self.assertFalse(np.isinf(exported[['gt_psad', 'clinical_psad', 'model_psad']]).any().any())
@@ -277,14 +281,14 @@ class LinkedPSADensityTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'Missing PSA-density stratum'):
             self.execute(STRATUM_INFERENCE_SOURCE, namespace)
 
-    def run_inference(self, errors, selected=None):
+    def run_inference(self, errors, selected=None, references=None):
         selected = list(errors) if selected is None else selected
         n = len(next(iter(errors.values())))
         namespace = self.namespace(np.full(n, 10.), np.full(n, 100.), np.full(n, 100.), selected=selected)
         cases = namespace['volumes'][['ID', 'patient_id', 'study_id']].copy()
-        cases['gt_psad'] = .1
+        cases['gt_psad'] = .1 if references is None else references
         for key, error in errors.items():
-            cases[f'{key}_psad'] = .1 + np.asarray(error)
+            cases[f'{key}_psad'] = cases['gt_psad'] + np.asarray(error)
             cases[f'{key}_absolute_error_psad'] = np.abs(error)
         namespace.update(psad_cases=cases, PSAD_UNIT='ng/mL²')
         tree = ast.parse(INFERENCE_SOURCE)
@@ -300,6 +304,9 @@ class LinkedPSADensityTests(unittest.TestCase):
         result = namespace['psad_pairwise_statistics']
         exported = pd.read_csv(self.output / 'psa_density_pairwise_statistics.csv')
         self.assertEqual(result.shape, exported.shape)
+        if not result.empty:
+            np.testing.assert_allclose(exported.rmspe_improvement_pp, result.rmspe_improvement_pp)
+            np.testing.assert_allclose(exported.rmspe_bootstrap_p_holm, result.rmspe_bootstrap_p_holm)
         return result
 
     def test_density_inference_reproducibility_pairing_and_reversal(self):
@@ -513,6 +520,72 @@ class LinkedPSADensityTests(unittest.TestCase):
         self.assertTrue(namespace['biopsy_cases'].empty)
         for extension in ['png', 'pdf']:
             self.assertGreater((self.output / f'psa_density_biopsy_confusion.{extension}').stat().st_size, 0)
+
+
+
+    def test_rmspe_variable_references_and_pairing(self):
+        from scipy import stats
+
+        references = np.linspace(20., 200., 30)
+        errors = np.linspace(.5, 4.5, 30)
+        row = self.run_inference(dict(a=errors, b=2 * errors), references=references).iloc[0]
+        percent = 100 * errors / references
+        expected = stats.bootstrap(
+            (percent,), lambda x, axis: np.sqrt(np.mean(x**2, axis=axis)),
+            vectorized=True, n_resamples=1999, batch=113,
+            rng=np.random.default_rng(20261102), method='BCa',
+        ).confidence_interval
+        self.assertAlmostEqual(row.rmspe_a_percent, np.sqrt(np.mean(percent**2)))
+        self.assertAlmostEqual(row.rmspe_b_percent, 2 * row.rmspe_a_percent)
+        self.assertAlmostEqual(row.rmspe_improvement_pp, row.rmspe_a_percent)
+        np.testing.assert_allclose(
+            [row.rmspe_improvement_ci_lower_pp, row.rmspe_improvement_ci_upper_pp], expected,
+        )
+        reverse = self.run_inference(dict(b=2 * errors, a=errors), references=references).iloc[0]
+        self.assertAlmostEqual(row.rmspe_improvement_pp, -reverse.rmspe_improvement_pp)
+        self.assertAlmostEqual(row.rmspe_improvement_ci_lower_pp, -reverse.rmspe_improvement_ci_upper_pp)
+        self.assertEqual(row.rmspe_bootstrap_p, reverse.rmspe_bootstrap_p)
+
+    def test_rmspe_and_rmse_can_favor_different_methods(self):
+        references = np.tile([10., 100.], 20)
+        row = self.run_inference(
+            dict(a=np.tile([5., 0.], 20), b=np.tile([0., 10.], 20)), references=references,
+        ).iloc[0]
+        self.assertGreater(row.rmse_improvement_psad, 0)
+        self.assertLess(row.rmspe_improvement_pp, 0)
+
+    def test_rmspe_separate_holm_families_and_reproducibility(self):
+        from statsmodels.stats.multitest import multipletests
+
+        errors = dict(a=np.linspace(.2, 2, 30), b=np.linspace(3, 15, 30), c=np.linspace(5, 20, 30))
+        result = self.run_inference(errors)
+        pd.testing.assert_frame_equal(result, self.run_inference(errors))
+        self.assertTrue(result.rmspe_holm_family_size.eq(3).all())
+        self.assertTrue(result.holm_family_size.eq(6).all())
+        np.testing.assert_allclose(result.rmspe_bootstrap_p_holm,
+                                   multipletests(result.rmspe_bootstrap_p, method='holm')[1])
+        np.testing.assert_allclose(result.rmspe_t_sensitivity_p_holm,
+                                   multipletests(result.rmspe_t_sensitivity_p, method='holm')[1])
+        expected = multipletests(result[['rmse_bootstrap_p', 'closer_exact_p']].to_numpy().ravel(),
+                                method='holm')[1].reshape(-1, 2)
+        np.testing.assert_allclose(result[['rmse_bootstrap_p_holm', 'closer_exact_p_holm']], expected)
+
+    def test_rmspe_degenerate_errors_and_invalid_references(self):
+        row = self.run_inference(dict(a=np.ones(20), b=np.full(20, 2)), references=np.full(20, 100.)).iloc[0]
+        self.assertEqual(row.rmspe_improvement_pp, 1)
+        self.assertEqual(row.rmspe_improvement_ci_lower_pp, 1)
+        self.assertEqual(row.rmspe_improvement_ci_upper_pp, 1)
+        self.assertEqual(row.rmspe_ci_method, 'deterministic')
+        self.assertAlmostEqual(row.rmspe_bootstrap_p, 1 / 2000)
+        self.assertTrue(np.isnan(row.rmspe_t_sensitivity_p_holm))
+        self.assertEqual(row.rmspe_t_sensitivity_conclusion, 'undefined')
+        tied = self.run_inference(dict(a=np.ones(20), b=np.ones(20))).iloc[0]
+        self.assertEqual(tied.rmspe_improvement_pp, 0)
+        self.assertEqual(tied.rmspe_bootstrap_p, 1)
+        self.assertTrue(self.run_inference(dict(a=np.ones(20))).empty)
+        for invalid in [0., -1., np.nan, np.inf]:
+            with self.subTest(reference=invalid), self.assertRaises(AssertionError):
+                self.run_inference(dict(a=np.ones(20), b=np.full(20, 2)), references=np.full(20, invalid))
 
 
 if __name__ == '__main__':

@@ -10,7 +10,12 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+import warnings
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, NullFormatter
 import msoffcrypto
 import nibabel as nib
 import numpy as np
@@ -22,6 +27,7 @@ SOURCE = NOTEBOOK.read_text()
 SELECTION = SOURCE[SOURCE.index('listing = pd.read_csv('):SOURCE.index('# %% [markdown]\n# ## Workbook loading')]
 LOADING = SOURCE[SOURCE.index("with WORKBOOK.open('rb')"):SOURCE.index('# %% [markdown]\n# ## Link clinical fields')]
 LINKAGE = SOURCE[SOURCE.index('READER_FIELDS = ['):SOURCE.index('# %% [markdown]\n# ## Direct measurements')]
+REPORT_QUALITY = SOURCE[SOURCE.index('# %% [markdown]\n# ## Clinical report volume quality check'):SOURCE.index('# %% [markdown]\n# ## Local reproducibility record')]
 MEASUREMENT = SOURCE[SOURCE.index('input_hashes = {}'):SOURCE.index('# %% [markdown]\n# ## Volume accuracy')]
 SUMMARY = SOURCE[SOURCE.index('gt = volumes['):SOURCE.index('# %% [markdown]\n# ## Agreement plots')]
 STATISTICS = SOURCE[SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):SOURCE.index('# %% [markdown]\n# ## PSA density inputs')]
@@ -201,6 +207,312 @@ class TorontoVolumeTests(unittest.TestCase):
         (self.prediction.parent / 'plans.json').write_text(json.dumps(dict(dataset_name='wrong')))
         with self.assertRaisesRegex(ValueError, 'dataset identity'):
             self.execute(MEASUREMENT)
+
+
+class TorontoReportVolumeQualityTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(plt.close, 'all')
+        self.out = Path(self.tmp.name)
+
+    def namespace(self, dimensions, reported, censored=None):
+        fields = ['dim1_report_ref', 'dim2_report_ref', 'dim3_report_ref']
+        n = len(reported)
+        cases = pd.DataFrame(dict(
+            ID=[f'case-{i}' for i in range(n)], amrn=[f'p{i}' for i in range(n)],
+            aano=[f's{i}' for i in range(n)], vol_report_ref=reported,
+            clinical_volume_ml=reported,
+            gt_volume_ml=np.linspace(25., 75., n),
+            psa_consolidated=np.linspace(5., 15., n),
+            pirads=np.full(n, 3.), cscancer=['unknown'] * n,
+        ))
+        for axis, field in enumerate(fields):
+            cases[field] = [row[axis] for row in dimensions]
+            cases[f'{field}_numeric'] = cases[field].astype(float)
+            cases[f'{field}_censored'] = False if censored is None else [row[axis] for row in censored]
+        return dict(pd=pd, np=np, plt=plt, NullFormatter=NullFormatter, FuncFormatter=FuncFormatter,
+                    cases=cases, DIMENSION_FIELDS=fields,
+                    PSAD_BINS=[0, .10, .15, .20, np.inf],
+                    PSAD_STRATA=['0–<0.10', '0.10–<0.15', '0.15–<0.20', '≥0.20'],
+                    BIOPSY_PSAD_THRESHOLD=.15,
+                    OUTPUT_DIR=self.out, display=lambda *args: None)
+
+    def execute(self, ns, source=REPORT_QUALITY):
+        with patch.object(plt, 'show'), warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always', UserWarning)
+            exec(compile(source, str(NOTEBOOK), 'exec'), ns)
+        self.assertFalse(any('constrained_layout not applied' in str(item.message) for item in caught))
+
+    def test_review_table_preserves_flagged_order_values_and_display_precision(self):
+        ns = self.namespace([[3, 4, 5]] * 5, [30., 20., 60., 35., 31.])
+        ns['cases'].index = [12, 4, 30, 7, 2]
+        ns['cases']['dim1_report_ref'] = '3,0'
+        ns['cases']['pirads'] = [2., np.nan, 4., 3., 5.]
+        ns['cases']['cscancer'] = ['N', 'unknown', 'Y', 'N', 'Y']
+        original = ns['cases'].copy(deep=True)
+        shown = []
+        ns['display'] = lambda *args: shown.extend(args)
+        self.execute(ns)
+        table = ns['report_volume_quality_table']
+        self.assertEqual(table.columns.tolist(), [
+            'dim1', 'dim2', 'dim3', 'recalculated_volume_ml', 'recalculated_psad',
+            'report_volume_ml', 'report_psad', 'manual_planimetry_volume_ml',
+            'manual_planimetry_psad', 'PIRADS', 'CSCANCER',
+        ])
+        flagged = original.iloc[[1, 2, 3]].reset_index(drop=True)
+        np.testing.assert_allclose(table[['dim1', 'dim2', 'dim3']], [[3., 4., 5.]] * 3)
+        np.testing.assert_allclose(table.recalculated_volume_ml, 10 * np.pi)
+        np.testing.assert_allclose(table.recalculated_psad, flagged.psa_consolidated / (10 * np.pi))
+        np.testing.assert_allclose(table.report_volume_ml, flagged.clinical_volume_ml)
+        np.testing.assert_allclose(table.report_psad, flagged.psa_consolidated / flagged.clinical_volume_ml)
+        np.testing.assert_allclose(table.manual_planimetry_volume_ml, flagged.gt_volume_ml)
+        np.testing.assert_allclose(table.manual_planimetry_psad, flagged.psa_consolidated / flagged.gt_volume_ml)
+        np.testing.assert_allclose(table.PIRADS, flagged.pirads, equal_nan=True)
+        self.assertEqual(table.CSCANCER.tolist(), ['unknown', 'Y', 'N'])
+        self.assertNotEqual(table.recalculated_volume_ml.iloc[0], round(10 * np.pi, 2))
+        saved = pd.read_csv(self.out / 'report_volume_quality_table.csv')
+        pd.testing.assert_frame_equal(saved, table)
+        pd.testing.assert_frame_equal(ns['cases'], original)
+        self.assertIs(shown[-1].data, table)
+        rendered = shown[-1].to_html()
+        for formatted in ['3.00', '31.42', f'{table.recalculated_psad.iloc[0]:.3f}', 'unknown', '—']:
+            self.assertIn(f'>{formatted}</td>', rendered)
+        self.assertNotIn('row_heading', rendered)
+        self.assertNotIn('case-', rendered)
+
+    def test_no_flags_writes_header_only_review_table(self):
+        ns = self.namespace([[3, 4, 5]] * 2, [30., 31.])
+        self.execute(ns)
+        table = ns['report_volume_quality_table']
+        self.assertTrue(table.empty)
+        saved = pd.read_csv(self.out / 'report_volume_quality_table.csv')
+        self.assertTrue(saved.empty)
+        self.assertEqual(saved.columns.tolist(), table.columns.tolist())
+        self.assertEqual(len((self.out / 'report_volume_quality_table.csv').read_text().splitlines()), 1)
+
+    def test_review_summary_counts_unrounded_category_changes_and_pirads3_crossings(self):
+        ns = self.namespace([], [])
+        ns['report_volume_quality_table'] = pd.DataFrame(dict(
+            report_psad=[.09, .10, .15, .20, .14999, .15001, .14999, .15001, .11],
+            recalculated_psad=[.10, .15, .20, .19999, .15, .14999, .15, .14999, .11],
+            PIRADS=[3, 3, 3, 3, 3, 3, 4, np.nan, 3],
+        ))
+        original = ns['report_volume_quality_table'].copy(deep=True)
+        output = StringIO()
+        with redirect_stdout(output):
+            self.execute(ns, REPORT_QUALITY[REPORT_QUALITY.index('# %%\n# Summarize the flagged rows'):])
+        self.assertIn('PSAD category changed: 8 / 9 (higher: 5; lower: 3).', output.getvalue())
+        self.assertIn('PI-RADS 3 crossing 0.15: 3 / 7 (below → ≥ cutoff: 2; ≥ cutoff → below: 1).',
+                      output.getvalue())
+        self.assertEqual(ns['quality_category_changed'].tolist(), [True] * 8 + [False])
+        pd.testing.assert_frame_equal(ns['report_volume_quality_table'], original)
+
+    def test_review_summary_without_flags_prints_zero_counts(self):
+        ns = self.namespace([[3, 4, 5]] * 2, [30., 31.])
+        output = StringIO()
+        with redirect_stdout(output):
+            self.execute(ns)
+        self.assertIn('PSAD category changed: 0 / 0 (higher: 0; lower: 0).', output.getvalue())
+        self.assertIn('PI-RADS 3 crossing 0.15: 0 / 0', output.getvalue())
+
+    def test_quality_review_is_final_analysis_section(self):
+        self.assertLess(SOURCE.index('# ## PI-RADS 3: biopsy decisions'),
+                        SOURCE.index('# ## Clinical report volume quality check'))
+        remaining_headings = [
+            line for line in SOURCE[SOURCE.index('# ## Clinical report volume quality check'):].splitlines()
+            if line.startswith('# ## ')
+        ]
+        self.assertEqual(remaining_headings, [
+            '# ## Clinical report volume quality check', '# ## Local reproducibility record',
+        ])
+
+    def test_exact_bounds_inclusive_classification_and_all_case_agreement(self):
+        # For dimensions 3 × 4 × 5 cm, ±0.1 cm gives 27.7095 and 10.8035π mL.
+        lower, upper = 27.7095, 10.8035 * np.pi
+        reported = [lower, upper, lower - .01, upper + .01, 10 * np.pi]
+        ns = self.namespace([[3, 4, 5]] * 5, reported)
+        ns['cases']['dim1_report_ref'] = '3,0'
+        original = ns['cases'].copy(deep=True)
+        self.execute(ns)
+        quality = ns['report_volume_quality']
+        np.testing.assert_allclose(quality.ellipsoid_volume_ml, 10 * np.pi)
+        np.testing.assert_allclose(quality.lower_bound_ml, lower)
+        np.testing.assert_allclose(quality.upper_bound_ml, upper)
+        self.assertEqual(quality.classification.tolist(), [
+            'Within range', 'Within range', 'Below range', 'Above range', 'Within range',
+        ])
+        difference = 10 * np.pi - np.array(reported)
+        mean = (10 * np.pi + np.array(reported)) / 2
+        np.testing.assert_allclose(quality.mean_volume_ml, mean)
+        np.testing.assert_allclose(quality.difference_ml, difference, atol=1e-12)
+        stats = ns['report_volume_quality_statistics'].iloc[0]
+        self.assertEqual(stats.n_cases, 5)
+        self.assertAlmostEqual(stats.bias_ml, difference.mean())
+        self.assertAlmostEqual(stats.loa_lower_ml, difference.mean() - 1.96 * difference.std(ddof=1))
+        self.assertAlmostEqual(stats.loa_upper_ml, difference.mean() + 1.96 * difference.std(ddof=1))
+        counts = ns['report_volume_quality_counts']
+        self.assertEqual(counts.n.tolist(), [3, 1, 1, 0])
+        np.testing.assert_allclose(counts.percent_of_selected_cohort, [60, 20, 20, 0])
+        self.assertNotIn('assessable', quality.columns)
+        self.assertEqual(len(ns['fig'].axes), 2)
+        self.assertEqual(ns['fig'].get_figwidth(), 7.5)
+        self.assertTrue(ns['axes'][0].get_shared_x_axes().joined(*ns['axes']))
+        self.assertTrue(ns['axes'][0].get_shared_y_axes().joined(*ns['axes']))
+        for panel in ns['axes']:
+            self.assertGreater(panel.get_position().width * ns['fig'].get_figwidth(), 2.4)
+            self.assertEqual(panel.get_xlim(), (10, 300))
+            self.assertEqual(panel.get_ylim(), (-40, 40))
+            np.testing.assert_array_equal(panel.get_xticks(), [10, 30, 100, 300])
+            self.assertEqual([tick.get_text() for tick in panel.get_xticklabels()], ['10', '30', '100', '300'])
+        reference = original.gt_volume_ml.to_numpy()
+        reference_difference = np.array(reported) - reference
+        agreement_ax = ns['axes'][1]
+        for collection, agreement_collection, indices in zip(
+            ns['ax'].collections, agreement_ax.collections, [[0, 1, 4], [], [3], [2]],
+        ):
+            np.testing.assert_allclose(collection.get_offsets(),
+                                       np.column_stack([mean[indices], difference[indices]]), atol=1e-12)
+            np.testing.assert_allclose(
+                agreement_collection.get_offsets(),
+                np.column_stack([reference[indices], reference_difference[indices]]), atol=1e-12,
+            )
+            self.assertEqual(collection.get_label(), agreement_collection.get_label())
+            np.testing.assert_array_equal(collection.get_facecolors(), agreement_collection.get_facecolors())
+            np.testing.assert_array_equal(collection.get_edgecolors(), agreement_collection.get_edgecolors())
+            np.testing.assert_array_equal(collection.get_paths()[0].vertices,
+                                          agreement_collection.get_paths()[0].vertices)
+        self.assertEqual(agreement_ax.get_xscale(), 'log')
+        self.assertEqual(agreement_ax.get_ylabel().replace('\n', ' '),
+                         'Reported volume − manual planimetry (mL)')
+        expected_levels = [reference_difference.mean(),
+                           reference_difference.mean() - 1.96 * reference_difference.std(ddof=1),
+                           reference_difference.mean() + 1.96 * reference_difference.std(ddof=1)]
+        np.testing.assert_allclose([line.get_ydata()[0] for line in agreement_ax.lines], expected_levels)
+        pd.testing.assert_frame_equal(ns['cases'], original)
+        audit = pd.read_csv(self.out / 'report_volume_quality_audit.csv')
+        self.assertEqual(audit.ID.tolist(), original.ID.tolist())
+        self.assertEqual(audit.dim1_report_ref.tolist(), ['3,0'] * 5)
+        np.testing.assert_allclose(audit.vol_report_ref, reported)
+        for extension in ['png', 'pdf']:
+            self.assertGreater((self.out / f'report_volume_quality.{extension}').stat().st_size, 0)
+
+    def test_missing_coefficient_rounding_bounds_and_above_range_requirement(self):
+        # Hand-calculated products at ±0.1 cm for dimensions 3 × 4 × 5 cm.
+        lower, upper = 55.419, 64.821
+        reported = [60., lower, upper, lower - .001, upper + .001, 30., 20.]
+        ns = self.namespace([[3, 4, 5]] * len(reported), reported)
+        self.execute(ns)
+        quality = ns['report_volume_quality']
+        self.assertEqual(quality.classification.tolist(), [
+            'Missing coefficient', 'Missing coefficient', 'Missing coefficient',
+            'Above range', 'Above range', 'Within range', 'Below range',
+        ])
+        np.testing.assert_allclose(quality.missing_coefficient_volume_ml, 60.)
+        np.testing.assert_allclose(quality.missing_coefficient_lower_bound_ml, lower)
+        np.testing.assert_allclose(quality.missing_coefficient_upper_bound_ml, upper)
+        counts = ns['report_volume_quality_counts'].set_index('classification')
+        self.assertEqual(counts.loc['Missing coefficient', 'n'], 3)
+        self.assertEqual(counts.n.sum(), len(reported))
+        self.assertAlmostEqual(counts.percent_of_selected_cohort.sum(), 100.)
+        self.assertEqual(ns['report_volume_quality_statistics'].n_cases.iloc[0], len(reported))
+        missing = ns['ax'].collections[1]
+        above = ns['ax'].collections[2]
+        self.assertEqual(len(missing.get_offsets()), 3)
+        self.assertEqual(len(missing.get_facecolors()), 0)
+        np.testing.assert_allclose(missing.get_edgecolors(), above.get_edgecolors())
+        np.testing.assert_array_equal(missing.get_paths()[0].vertices, above.get_paths()[0].vertices)
+        audit = pd.read_csv(self.out / 'report_volume_quality_audit.csv')
+        self.assertEqual(audit.classification.tolist(), quality.classification.tolist())
+
+        # Ranges can overlap for small dimensions; only above-range reports qualify.
+        ns = self.namespace([[.2, .2, .2]] * 2, [.008, .03])
+        self.execute(ns)
+        self.assertEqual(ns['report_volume_quality'].classification.tolist(), [
+            'Within range', 'Above range',
+        ])
+
+    def test_invalid_and_censored_dimensions_stop_before_outputs(self):
+        dimensions = [
+            [value if index == axis else [3, 4, 5][index] for index in range(3)]
+            for axis in range(3) for value in [np.nan, 0., -1., np.inf, -np.inf]
+        ] + [[-3, -4, 5], [1e200] * 3, [1e-200] * 3]
+        for values in dimensions:
+            with self.subTest(dimensions=values):
+                ns = self.namespace([values, [3, 4, 5]], [30., 30.])
+                original = ns['cases'].copy(deep=True)
+                with self.assertRaisesRegex(AssertionError, 'Every selected case must be assessable'):
+                    self.execute(ns)
+                pd.testing.assert_frame_equal(ns['cases'], original)
+        for axis in range(3):
+            with self.subTest(censored_axis=axis):
+                ns = self.namespace([[3, 4, 5]] * 2, [30., 30.],
+                                    [[index == axis for index in range(3)], [False] * 3])
+                with self.assertRaisesRegex(AssertionError, 'Every selected case must be assessable'):
+                    self.execute(ns)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_empty_cohort_stops_before_outputs(self):
+        ns = self.namespace([], [])
+        with self.assertRaisesRegex(AssertionError, 'Every selected case must be assessable'):
+            self.execute(ns)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_clipped_measurements_remain_in_audit_and_statistics(self):
+        ns = self.namespace([[3, 4, 5], [8, 96.5, 6.3]], [30., 80.])
+        original = ns['cases'].copy(deep=True)
+        self.execute(ns)
+        quality = ns['report_volume_quality']
+        self.assertEqual(quality.classification.iloc[1], 'Below range')
+        self.assertEqual(ns['report_volume_quality_statistics'].n_cases.iloc[0], 2)
+        self.assertAlmostEqual(ns['report_volume_quality_statistics'].bias_ml.iloc[0], quality.difference_ml.mean())
+        ax = ns['ax']
+        self.assertEqual(ax.get_xscale(), 'log')
+        self.assertEqual(ax.get_xlim(), (10, 300))
+        self.assertEqual(ax.get_ylim(), (-40, 40))
+        np.testing.assert_array_equal(ax.get_xticks(), [10, 30, 100, 300])
+        self.assertEqual([tick.get_text() for tick in ax.get_xticklabels()], ['10', '30', '100', '300'])
+        self.assertIsInstance(ax.xaxis.get_minor_formatter(), NullFormatter)
+        self.assertIn('log scale', ax.get_xlabel())
+        self.assertGreater(quality.mean_volume_ml.iloc[1], ax.get_xlim()[1])
+        self.assertGreater(quality.difference_ml.iloc[1], ax.get_ylim()[1])
+        self.assertEqual(ns['quality_outside_count'], 1)  # Exceeds both axes, counted once.
+        self.assertIn('Outside displayed range:\n1 / 2 (50.0%).',
+                      [text.get_text() for text in ax.texts])
+        legend = [text.get_text() for text in ns['fig'].legends[0].get_texts()]
+        self.assertEqual(legend, [
+            'Within expected range (n = 1)',
+            'Missing coefficient (d1 × d2 × d3; ±0.1 cm) (n = 0)',
+            'Otherwise expected from dimensions < reported volume (n = 0)',
+            'Expected from dimensions > reported volume (n = 1)',
+        ])
+        self.assertEqual([text.get_text() for text in ax.get_legend().get_texts()], ['zero difference'])
+        self.assertEqual(len(ax.lines), 1)
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), [0, 0])
+        audit = pd.read_csv(self.out / 'report_volume_quality_audit.csv')
+        self.assertEqual(audit.ID.tolist(), original.ID.tolist())
+        np.testing.assert_allclose(audit.difference_ml, quality.difference_ml)
+        pd.testing.assert_frame_equal(ns['cases'], original)
+
+    def test_display_boundaries_are_inclusive(self):
+        # Test exact display coordinates independently of ellipsoid arithmetic.
+        quality = pd.DataFrame(dict(
+            mean_volume_ml=[10, 300, 50, 50, 9, 301, 50, 50, 301],
+            difference_ml=[0, 0, -40, 40, 0, 0, -41, 41, 41],
+            classification=['Within range'] * 9,
+        ))
+        ns = dict(np=np, pd=pd, plt=plt, NullFormatter=NullFormatter, FuncFormatter=FuncFormatter,
+                  cases=pd.DataFrame({'gt_volume_ml': [50.] * len(quality)}),
+                  OUTPUT_DIR=self.out, report_volume_quality=quality,
+                  quality_differences=quality.difference_ml)
+        quality['reported_volume_ml'] = quality.mean_volume_ml - quality.difference_ml / 2
+        self.execute(ns, REPORT_QUALITY[
+            REPORT_QUALITY.index('fig, axes = plt.subplots'):REPORT_QUALITY.index('# %%\nquality_flagged =')
+        ])
+        self.assertEqual(ns['quality_outside_view'].tolist(), [False] * 4 + [True] * 5)
+        self.assertEqual(ns['quality_outside_count'], 5)
+        self.assertIn('Outside displayed range:\n5 / 9 (55.6%).',
+                      [text.get_text() for text in ns['ax'].texts])
 
 
 class TorontoClinicalFieldsTests(unittest.TestCase):

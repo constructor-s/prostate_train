@@ -14,7 +14,8 @@
 # PSA and outcome fields and derive PSA density using the same PSA for all methods.
 # Include PSAD agreement and PI-RADS 3 biopsy threshold simulation. All outputs remain local under the
 # Git-ignored `results/toronto_jdmi_clinical_volume/` directory. Display only
-# aggregates; patient identifiers and image paths belong in the local audits.
+# aggregates and the final flagged-case review table without patient identifiers;
+# patient identifiers and image paths belong in the local audits.
 
 # %%
 import hashlib
@@ -1625,6 +1626,260 @@ fig.colorbar(heatmap, ax=list(axes.ravel()), label='Proportion within outcome ro
 fig.savefig(OUTPUT_DIR / 'psa_density_biopsy_confusion.png', dpi=300)
 fig.savefig(OUTPUT_DIR / 'psa_density_biopsy_confusion.pdf')
 plt.show()
+
+# %% [markdown]
+# ## Clinical report volume quality check
+#
+# Compare the reported clinical volume with π/6 × d1 × d2 × d3, using parsed
+# report dimensions in cm and volumes in mL. This is a consistency screen, not
+# a comparison against manual-reader planimetry. The assumed range is inclusive:
+# **lower = 0.5 × (d1−0.1) × (d2−0.1) × (d3−0.1)** and
+# **upper = π/6 × (d1+0.1) × (d2+0.1) × (d3+0.1)**.
+# This allows dimension uncertainty of ±0.1 cm (±1 mm) and coefficient choice
+# between 0.5 and π/6; it is broader than nearest-0.1-cm rounding alone.
+# Compare the reported volume directly, without additional volume rounding.
+# Among reports above the upper bound, classify **Missing coefficient** when
+# the volume matches d1 × d2 × d3 (coefficient 1), allowing ±0.1 cm on
+# each dimension: **(d1−0.1) × (d2−0.1) × (d3−0.1)** through
+# **(d1+0.1) × (d2+0.1) × (d3+0.1)** mL, inclusive.
+# Flags warrant review and do not establish reporting errors or change eligibility.
+# Require every selected case to have positive finite uncensored dimensions
+# and valid calculated volumes; stop on invalid inputs rather than omit cases.
+# Counts and percentages use the entire selected cohort as their denominator.
+#
+# The Bland–Altman plot uses pairwise mean volume on x and calculated minus
+# reported volume on y. Bias and descriptive 95% limits of agreement (mean
+# difference ±1.96 sample SD) include all selected cases, including flags.
+# These statistics appear in the table; the plot shows only the zero-difference line.
+# These normal-theory limits are not the assumed consistency bounds and can be
+# sensitive to extreme values. Both panels share x and y axes: display 10–300 mL
+# on logarithmic x-axes and −40 to +40 mL on y. In the first panel, count points
+# outside either limit once in the annotation. Display boundaries are inclusive.
+# Clipped points remain in the statistics and audit; the outside-view percentage
+# uses all selected cases.
+# The second panel shows reported volume minus manual-reader planimetry against
+# the manual reference volume, retaining the same consistency groups. Positive
+# differences indicate overestimation. Its bias and descriptive 95% limits of
+# agreement include all selected cases; the reference-volume axis is logarithmic.
+# Identifiers remain in the local audit only. After the plots, display and export
+# a table of Below range, Above range, and Missing coefficient cases in cohort
+# order. Dimensions are parsed cm; recalculated, reported, and median manual-reader
+# planimetry volumes are mL. Each corresponding PSAD uses the same consolidated
+# PSA divided by volume (ng/mL²). Retain missing PI-RADS and unknown CSCANCER.
+# Display dimensions/volumes to two decimals and PSAD to three decimals; keep
+# full precision in the dataframe and CSV. The table contains no identifiers.
+
+# %%
+report_volume_quality = cases[[
+    'ID', 'amrn', 'aano', 'vol_report_ref', *DIMENSION_FIELDS,
+    *[f'{field}_numeric' for field in DIMENSION_FIELDS],
+    *[f'{field}_censored' for field in DIMENSION_FIELDS],
+]].copy()
+report_volume_quality['reported_volume_ml'] = cases.clinical_volume_ml
+quality_dimensions = report_volume_quality[[f'{field}_numeric' for field in DIMENSION_FIELDS]]
+quality_censored = report_volume_quality[[f'{field}_censored' for field in DIMENSION_FIELDS]].any(axis=1)
+with np.errstate(over='ignore', invalid='ignore'):
+    report_volume_quality['ellipsoid_volume_ml'] = np.pi / 6 * quality_dimensions.prod(axis=1, skipna=False)
+    report_volume_quality['lower_bound_ml'] = 0.5 * (quality_dimensions - 0.1).prod(axis=1, skipna=False)
+    report_volume_quality['upper_bound_ml'] = np.pi / 6 * (quality_dimensions + 0.1).prod(axis=1, skipna=False)
+    report_volume_quality['missing_coefficient_volume_ml'] = quality_dimensions.prod(axis=1, skipna=False)
+    report_volume_quality['missing_coefficient_lower_bound_ml'] = (quality_dimensions - 0.1).prod(axis=1, skipna=False)
+    report_volume_quality['missing_coefficient_upper_bound_ml'] = (quality_dimensions + 0.1).prod(axis=1, skipna=False)
+quality_calculated_fields = [
+    'ellipsoid_volume_ml', 'lower_bound_ml', 'upper_bound_ml',
+    'missing_coefficient_volume_ml', 'missing_coefficient_lower_bound_ml',
+    'missing_coefficient_upper_bound_ml',
+]
+assert not quality_dimensions.empty and (
+    np.isfinite(quality_dimensions).all(axis=1) & quality_dimensions.gt(0).all(axis=1)
+    & ~quality_censored
+    & np.isfinite(report_volume_quality[quality_calculated_fields]).all(axis=1)
+    & report_volume_quality.ellipsoid_volume_ml.gt(0)
+).all(), (
+    'Every selected case must be assessable: require positive finite uncensored dimensions, '
+    'positive finite ellipsoid volumes, and finite bounds; inspect clinical_fields_audit.csv'
+)
+# Treat numerically equivalent boundary calculations as equal (floating-point
+# tolerance only, not an additional allowance for reported-volume rounding).
+quality_below_range = (
+    report_volume_quality.reported_volume_ml.lt(report_volume_quality.lower_bound_ml)
+    & ~np.isclose(report_volume_quality.reported_volume_ml, report_volume_quality.lower_bound_ml,
+                  rtol=1e-12, atol=1e-12)
+)
+quality_above_range = (
+    report_volume_quality.reported_volume_ml.gt(report_volume_quality.upper_bound_ml)
+    & ~np.isclose(report_volume_quality.reported_volume_ml, report_volume_quality.upper_bound_ml,
+                  rtol=1e-12, atol=1e-12)
+)
+quality_missing_coefficient = quality_above_range & (
+    report_volume_quality.reported_volume_ml.ge(report_volume_quality.missing_coefficient_lower_bound_ml)
+    | np.isclose(report_volume_quality.reported_volume_ml,
+                 report_volume_quality.missing_coefficient_lower_bound_ml, rtol=1e-12, atol=1e-12)
+) & (
+    report_volume_quality.reported_volume_ml.le(report_volume_quality.missing_coefficient_upper_bound_ml)
+    | np.isclose(report_volume_quality.reported_volume_ml,
+                 report_volume_quality.missing_coefficient_upper_bound_ml, rtol=1e-12, atol=1e-12)
+)
+report_volume_quality['classification'] = np.select([
+    quality_below_range, quality_missing_coefficient, quality_above_range,
+], ['Below range', 'Missing coefficient', 'Above range'], default='Within range')
+report_volume_quality['mean_volume_ml'] = (
+    report_volume_quality.ellipsoid_volume_ml + report_volume_quality.reported_volume_ml
+) / 2
+report_volume_quality['difference_ml'] = (
+    report_volume_quality.ellipsoid_volume_ml - report_volume_quality.reported_volume_ml
+)
+report_volume_quality.to_csv(OUTPUT_DIR / 'report_volume_quality_audit.csv', index=False)
+
+report_volume_quality_counts = (
+    report_volume_quality.classification.value_counts()
+    .reindex(['Within range', 'Below range', 'Above range', 'Missing coefficient'], fill_value=0)
+    .rename_axis('classification').rename('n').reset_index()
+)
+report_volume_quality_counts['percent_of_selected_cohort'] = (
+    100 * report_volume_quality_counts.n / len(report_volume_quality)
+)
+quality_differences = report_volume_quality.difference_ml
+quality_bias = quality_differences.mean()
+quality_sd = quality_differences.std(ddof=1)
+quality_loa_lower, quality_loa_upper = quality_bias - 1.96 * quality_sd, quality_bias + 1.96 * quality_sd
+report_volume_quality_statistics = pd.DataFrame([dict(
+    n_cases=len(report_volume_quality), bias_ml=quality_bias,
+    loa_lower_ml=quality_loa_lower, loa_upper_ml=quality_loa_upper,
+)])
+display(report_volume_quality_counts, report_volume_quality_statistics)
+
+fig, axes = plt.subplots(1, 2, figsize=(7.5, 4.8), constrained_layout=True, sharex=True, sharey=True)
+fig.suptitle(f'Clinical report volume (n = {len(quality_differences)})', fontsize=10)
+ax = axes[0]
+quality_plot_groups = [
+    ('Within range', 'Within expected range', 'tab:blue', 'o'),
+    ('Missing coefficient', 'Missing coefficient (d1 × d2 × d3; ±0.1 cm)', 'tab:red', '^'),
+    ('Above range', 'Otherwise expected from dimensions < reported volume', 'tab:red', '^'),
+    ('Below range', 'Expected from dimensions > reported volume', 'tab:orange', 'v'),
+]
+for classification, legend_label, color, marker in quality_plot_groups:
+    group = report_volume_quality.loc[report_volume_quality.classification.eq(classification)]
+    ax.scatter(group.mean_volume_ml, group.difference_ml, edgecolors=color,
+               facecolors='none' if classification == 'Missing coefficient' else color, marker=marker,
+               s=28, alpha=.75, label=f'{legend_label} (n = {len(group)})')
+quality_zero_line = ax.axhline(0, color='0.6', linewidth=.8, label='zero difference')
+ax.set_xlabel('Mean of calculated ellipsoid and reported\nvolume (mL; log scale)', fontsize=8)
+ax.set_ylabel('Calculated ellipsoid − reported\nvolume (mL)', fontsize=8)
+ax.set_title('Consistency with report dimensions\n±0.1 cm; coefficient 0.5–π/6', fontsize=9)
+ax.set_xscale('log')
+quality_volume_ticks = [10, 30, 100, 300]
+ax.set_xticks(quality_volume_ticks, labels=[str(tick) for tick in quality_volume_ticks])
+ax.xaxis.set_minor_formatter(NullFormatter())
+ax.set_xlim(10, 300)
+ax.set_ylim(-40, +40)
+quality_outside_view = ~(
+    report_volume_quality.mean_volume_ml.between(*ax.get_xlim())
+    & report_volume_quality.difference_ml.between(*ax.get_ylim())
+)
+quality_outside_count = int(quality_outside_view.sum())
+ax.text(.02, .92,
+        f'Outside displayed range:\n{quality_outside_count} / {len(quality_differences)} '
+        f'({100 * quality_outside_count / len(quality_differences):.1f}%).',
+        transform=ax.transAxes, ha='left', va='top', fontsize=7)
+ax.legend(handles=[quality_zero_line], loc='lower right', fontsize=7)
+
+quality_reference_ml = cases.gt_volume_ml
+quality_reference_difference_ml = report_volume_quality.reported_volume_ml - quality_reference_ml
+quality_reference_bias = quality_reference_difference_ml.mean()
+quality_reference_sd = quality_reference_difference_ml.std(ddof=1)
+quality_reference_loa_lower = quality_reference_bias - 1.96 * quality_reference_sd
+quality_reference_loa_upper = quality_reference_bias + 1.96 * quality_reference_sd
+quality_agreement_ax = axes[1]
+for classification, legend_label, color, marker in quality_plot_groups:
+    group_mask = report_volume_quality.classification.eq(classification)
+    quality_agreement_ax.scatter(
+        quality_reference_ml.loc[group_mask], quality_reference_difference_ml.loc[group_mask],
+        edgecolors=color, facecolors='none' if classification == 'Missing coefficient' else color,
+        marker=marker, s=28, alpha=.75, label=f'{legend_label} (n = {int(group_mask.sum())})',
+    )
+for level, linestyle, label in [
+    (quality_reference_bias, '-', f'Mean: {quality_reference_bias:.1f} mL'),
+    (quality_reference_loa_lower, '--',
+     f'95% LoA: [{quality_reference_loa_lower:.1f}, {quality_reference_loa_upper:.1f}] mL'),
+    (quality_reference_loa_upper, '--', '_nolegend_'),
+]:
+    quality_agreement_ax.axhline(level, color='0.4', linestyle=linestyle, linewidth=.8, label=label)
+quality_agreement_ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f'{value:+g}' if value else '0'))
+quality_agreement_ax.set_xlabel('Manual planimetry volume\n(mL; log scale)', fontsize=8)
+quality_agreement_ax.set_ylabel('Reported volume − manual\nplanimetry (mL)', fontsize=8)
+quality_agreement_ax.set_title('Agreement with manual planimetry', fontsize=9)
+quality_agreement_ax.legend(handles=quality_agreement_ax.lines[:2], loc='best', fontsize=7)
+for panel in axes:
+    panel.tick_params(axis='both', labelsize=8)
+# Reserve space for one shared group legend below both panels. Keeping long
+# group labels out of the axes preserves their width in the 7.5-inch figure.
+fig.legend(
+    handles=ax.collections, loc='outside lower center', fontsize=7,
+    frameon=False, handletextpad=.5, borderaxespad=.5,
+)
+fig.savefig(OUTPUT_DIR / 'report_volume_quality.png', dpi=300)
+fig.savefig(OUTPUT_DIR / 'report_volume_quality.pdf')
+plt.show()
+
+# %%
+quality_flagged = report_volume_quality.classification.isin([
+    'Below range', 'Above range', 'Missing coefficient',
+])
+report_volume_quality_table = pd.DataFrame({
+    'dim1': quality_dimensions[DIMENSION_FIELDS[0] + '_numeric'],
+    'dim2': quality_dimensions[DIMENSION_FIELDS[1] + '_numeric'],
+    'dim3': quality_dimensions[DIMENSION_FIELDS[2] + '_numeric'],
+    'recalculated_volume_ml': report_volume_quality.ellipsoid_volume_ml,
+    'recalculated_psad': cases.psa_consolidated / report_volume_quality.ellipsoid_volume_ml,
+    'report_volume_ml': report_volume_quality.reported_volume_ml,
+    'report_psad': cases.psa_consolidated / report_volume_quality.reported_volume_ml,
+    'manual_planimetry_volume_ml': cases.gt_volume_ml,
+    'manual_planimetry_psad': cases.psa_consolidated / cases.gt_volume_ml,
+    'PIRADS': cases.pirads,
+    'CSCANCER': cases.cscancer,
+}).loc[quality_flagged].reset_index(drop=True)
+report_volume_quality_table.to_csv(OUTPUT_DIR / 'report_volume_quality_table.csv', index=False)
+with pd.option_context(
+    'styler.render.max_rows', None, 'styler.render.max_columns', None,
+    'styler.render.max_elements', max(1, report_volume_quality_table.size),
+):
+    display(report_volume_quality_table.style.format({
+        'dim1': '{:.2f}', 'dim2': '{:.2f}', 'dim3': '{:.2f}',
+        'recalculated_volume_ml': '{:.2f}', 'recalculated_psad': '{:.3f}',
+        'report_volume_ml': '{:.2f}', 'report_psad': '{:.3f}',
+        'manual_planimetry_volume_ml': '{:.2f}', 'manual_planimetry_psad': '{:.3f}',
+        'PIRADS': '{:.0f}',
+    }, na_rep='—').hide(axis='index'))
+
+# %%
+# Summarize the flagged rows using unrounded PSAD: reported → recalculated.
+quality_report_stratum = pd.cut(
+    report_volume_quality_table.report_psad, PSAD_BINS, labels=PSAD_STRATA, right=False,
+)
+quality_recalculated_stratum = pd.cut(
+    report_volume_quality_table.recalculated_psad, PSAD_BINS, labels=PSAD_STRATA, right=False,
+)
+quality_category_changed = quality_report_stratum.ne(quality_recalculated_stratum)
+quality_category_higher = quality_recalculated_stratum.gt(quality_report_stratum)
+quality_category_lower = quality_recalculated_stratum.lt(quality_report_stratum)
+quality_pirads3 = report_volume_quality_table.PIRADS.eq(3)
+quality_report_above_cutoff = report_volume_quality_table.report_psad.ge(BIOPSY_PSAD_THRESHOLD)
+quality_recalculated_above_cutoff = report_volume_quality_table.recalculated_psad.ge(BIOPSY_PSAD_THRESHOLD)
+quality_threshold_up = quality_pirads3 & ~quality_report_above_cutoff & quality_recalculated_above_cutoff
+quality_threshold_down = quality_pirads3 & quality_report_above_cutoff & ~quality_recalculated_above_cutoff
+print('Flagged-case PSAD summary (reported → recalculated; ng/mL²)')
+print('Four PSAD categories: ' + ', '.join(PSAD_STRATA))
+print(
+    f'PSAD category changed: {int(quality_category_changed.sum())} / {len(report_volume_quality_table)} '
+    f'(higher: {int(quality_category_higher.sum())}; lower: {int(quality_category_lower.sum())}).'
+)
+print(
+    f'PI-RADS 3 crossing {BIOPSY_PSAD_THRESHOLD:g}: '
+    f'{int((quality_threshold_up | quality_threshold_down).sum())} / {int(quality_pirads3.sum())} '
+    f'(below → ≥ cutoff: {int(quality_threshold_up.sum())}; '
+    f'≥ cutoff → below: {int(quality_threshold_down.sum())}).'
+)
 
 # %% [markdown]
 # ## Local reproducibility record

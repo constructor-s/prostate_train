@@ -2,14 +2,16 @@
 import ast
 from contextlib import redirect_stdout
 import hashlib
-from io import StringIO
+from io import BytesIO, StringIO
 import itertools
 from itertools import combinations
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
+import msoffcrypto
 import nibabel as nib
 import numpy as np
 import pandas as pd
@@ -17,10 +19,13 @@ import pandas as pd
 
 NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks/toronto_jdmi_clinical_volume.py'
 SOURCE = NOTEBOOK.read_text()
-SELECTION = SOURCE[SOURCE.index('listing = pd.read_csv('):SOURCE.index('# %% [markdown]\n# ## Direct measurements')]
+SELECTION = SOURCE[SOURCE.index('listing = pd.read_csv('):SOURCE.index('# %% [markdown]\n# ## Workbook loading')]
+LOADING = SOURCE[SOURCE.index("with WORKBOOK.open('rb')"):SOURCE.index('# %% [markdown]\n# ## Link clinical fields')]
+LINKAGE = SOURCE[SOURCE.index('READER_FIELDS = ['):SOURCE.index('# %% [markdown]\n# ## Direct measurements')]
 MEASUREMENT = SOURCE[SOURCE.index('input_hashes = {}'):SOURCE.index('# %% [markdown]\n# ## Volume accuracy')]
 SUMMARY = SOURCE[SOURCE.index('gt = volumes['):SOURCE.index('# %% [markdown]\n# ## Agreement plots')]
-STATISTICS = SOURCE[SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):SOURCE.index('# %% [markdown]\n# ## Local reproducibility')]
+STATISTICS = SOURCE[SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):SOURCE.index('# %% [markdown]\n# ## PSA density inputs')]
+PSAD = SOURCE[SOURCE.index("PSAD_UNIT = 'ng/mL²'"):SOURCE.index("psad_gt = psad_cases['gt_psad']")]
 
 
 class TorontoVolumeTests(unittest.TestCase):
@@ -35,10 +40,13 @@ class TorontoVolumeTests(unittest.TestCase):
         self.csv = self.data / 'clinical.csv'
         self.exclude = self.data / 'exclude.json'
         self.exclude.write_text('[]')
+        workbook_path = self.data / 'workbook.xlsx'
+        workbook_path.write_bytes(b'synthetic workbook checksum input')
         self.ns = dict(
             pd=pd, np=np, nib=nib, json=json, hashlib=hashlib, Path=Path,
             itertools=itertools, combinations=combinations, REPO_ROOT=root,
             DATA_ROOT=self.data, CLINICAL_CSV=self.csv, EXCLUDE_JSON=self.exclude,
+            WORKBOOK=workbook_path,
             OUTPUT_DIR=self.out, EXPECTED_CASES=2, GEOMETRY_TOLERANCE_MM=.5,
             GEOMETRY_WARNING_THRESHOLD_MM=.001,
             SELECTED_COMPARATORS=['clinical', 'nnunet274', 'rumcnotprostatexnoclinical236'],
@@ -49,6 +57,14 @@ class TorontoVolumeTests(unittest.TestCase):
         )
         self.rows = [dict(ID=f'AIPR_p{i}_20260101_s{i}', t2=f'image{i}.nii.gz',
                           ground_truth_volume_ml=.2, vol_report_ref=.25) for i in range(2)]
+        self.ns['workbook'] = pd.DataFrame(dict(
+            aano=['s0', 's1'], amrn=['p0', 'p1'], psa_report_ref=[5., 12.],
+            psa=['', ''], reportmaxpirads_ref=[3, 3], CSCANCER=['N', 'Y'],
+            p_axt2_ch_vol=[.2, .2], p_axt2_ah_vol=['', ''], p_axt2_dd_vol=['', ''],
+            p_axt2_ao_vol=['', ''], p_axt2_chepg_vol=['', ''],
+            p_axt2_epgch_vol=['', ''], p_axt2_epg_vol=['', ''],
+            dim1_report_ref=[3., 3.], dim2_report_ref=[4., 4.], dim3_report_ref=[5., 5.],
+        ))
         self.save_listing()
         for i in range(2):
             self.image(self.data / f'image{i}.nii.gz')
@@ -84,21 +100,45 @@ class TorontoVolumeTests(unittest.TestCase):
         self.execute(SELECTION)
         self.assertEqual(len(self.ns['cases']), 2)
         audit = pd.read_csv(self.out / 'cohort_audit.csv')
-        self.assertEqual(audit.accession_excluded.sum(), 1)
+        self.assertEqual(audit.aano_excluded.sum(), 1)
         self.assertEqual(audit.invalid_reference_volume.sum(), 1)
+
+    def test_selection_uses_reported_volume_and_preserves_it_after_linkage(self):
+        self.execute(SELECTION)
+        np.testing.assert_allclose(self.ns['cases'].clinical_volume_ml, .25)
+        self.execute(LINKAGE)
+        np.testing.assert_allclose(self.ns['cases'].clinical_volume_ml, .25)
+        np.testing.assert_allclose(self.ns['cases'].dimension_ellipsoid_volume_ml, 10 * np.pi)
+
+    def test_missing_or_invalid_reported_volume_is_rejected(self):
+        for row in self.rows:
+            del row['vol_report_ref']
+        self.save_listing()
+        with self.assertRaisesRegex(AssertionError, 'lacks required columns'):
+            self.execute(SELECTION)
+        self.rows[1]['vol_report_ref'] = .25
+        for value in ['', None, 'invalid', 0, -1, np.inf, -np.inf]:
+            with self.subTest(volume=value):
+                self.rows[0]['vol_report_ref'] = value
+                self.save_listing()
+                with self.assertRaisesRegex(AssertionError, 'Invalid reported clinical volumes'):
+                    self.execute(SELECTION)
+                audit = pd.read_csv(self.out / 'cohort_audit.csv')
+                self.assertTrue(audit.included.all())
+                self.assertEqual(len(self.ns['cases']), 2)
 
     def test_duplicate_patients_invalid_ids_and_count_changes_stop_with_audit(self):
         for bad_id in ('AIPR_p0_20260201_s1', '../invalid', 'AIPR_bad/path_20260101_s1'):
             with self.subTest(bad_id=bad_id):
                 self.rows[1]['ID'] = bad_id
                 self.save_listing()
-                with self.assertRaises(ValueError):
+                with self.assertRaises(AssertionError):
                     self.execute(SELECTION)
                 self.assertTrue((self.out / 'cohort_audit.csv').is_file())
         self.rows[1]['ID'] = 'AIPR_p1_20260101_s1'
         self.save_listing()
         self.ns['EXPECTED_CASES'] = 3
-        with self.assertRaisesRegex(ValueError, 'count changed'):
+        with self.assertRaisesRegex(AssertionError, 'count changed'):
             self.execute(SELECTION)
 
     def test_same_size_membership_change_stops(self):
@@ -106,14 +146,16 @@ class TorontoVolumeTests(unittest.TestCase):
         (self.out / 'run_metadata.json').write_text(json.dumps(dict(cohort_sha256=self.ns['cohort_sha256'])))
         self.rows[1]['ID'] = 'AIPR_replacement_20260101_s1'
         self.save_listing()
-        with self.assertRaisesRegex(ValueError, 'membership changed'):
+        with self.assertRaisesRegex(AssertionError, 'membership changed'):
             self.execute(SELECTION)
 
     def test_native_volume_empty_prediction_and_summary(self):
         self.image(self.prediction, data=np.zeros((2, 2, 2), dtype=np.uint8))
         self.execute(SELECTION)
+        self.execute(LINKAGE)
         self.execute(MEASUREMENT)
         volumes = self.ns['volumes']
+        np.testing.assert_allclose(volumes.clinical_volume_ml, .25)
         np.testing.assert_allclose(volumes.nnunet274_volume_ml, [0., .192])
         np.testing.assert_allclose(volumes.rumcnotprostatexnoclinical236_volume_ml, [.192, .192])
         self.execute(SUMMARY)
@@ -126,6 +168,7 @@ class TorontoVolumeTests(unittest.TestCase):
 
     def test_missing_mask_labels_units_and_geometry_stop_with_measurement_audit(self):
         self.execute(SELECTION)
+        self.execute(LINKAGE)
         for problem in ('missing', 'labels', 'units', 'geometry', 'shape'):
             with self.subTest(problem=problem):
                 self.image(self.prediction)
@@ -152,6 +195,7 @@ class TorontoVolumeTests(unittest.TestCase):
         affine[0, 3] = .5
         self.image(self.prediction, affine=affine)
         self.execute(SELECTION)
+        self.execute(LINKAGE)
         self.execute(MEASUREMENT)
         self.assertAlmostEqual(self.ns['measurement_audit'].max_corner_displacement_mm.max(), .5)
         (self.prediction.parent / 'plans.json').write_text(json.dumps(dict(dataset_name='wrong')))
@@ -159,11 +203,218 @@ class TorontoVolumeTests(unittest.TestCase):
             self.execute(MEASUREMENT)
 
 
+class TorontoClinicalFieldsTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name)
+        self.cases = pd.DataFrame(dict(
+            ID=['AIPR_p0_20260101_s0', 'AIPR_p1_20260101_s1'],
+            amrn=['p0', 'p1'], aano=['s0', 's1'], gt_volume_ml=[50., 60.],
+            clinical_volume_ml=[40., 80.],
+            vol_report_ref=[40., 80.],
+        ))
+        self.workbook = pd.DataFrame(dict(
+            aano=[' s1 ', 's0'], amrn=[' p1 ', 'p0'], psa_report_ref=['', '>5,0'],
+            psa=['12', '99'], reportmaxpirads_ref=['3', '6'], CSCANCER=['Yes', 'NO BIOPSY'],
+            p_axt2_ch_vol=[0, 0], p_axt2_ah_vol=[50, 40], p_axt2_dd_vol=[70, 60],
+            p_axt2_ao_vol=['', ''], p_axt2_chepg_vol=['', ''],
+            p_axt2_epgch_vol=['', ''], p_axt2_epg_vol=['', ''],
+            dim1_report_ref=[3., 3.], dim2_report_ref=[4., 4.], dim3_report_ref=[5., 5.],
+        ))
+
+    def namespace(self):
+        return dict(pd=pd, np=np, cases=self.cases.copy(), workbook=self.workbook.copy(),
+                    OUTPUT_DIR=self.out, display=lambda *args: None)
+
+    def execute(self, source, namespace):
+        exec(compile(source, str(NOTEBOOK), 'exec'), namespace)
+
+    def test_linkage_order_raw_fields_reference_and_outcomes(self):
+        ns = self.namespace()
+        self.execute(LINKAGE, ns)
+        cases = ns['cases']
+        self.assertEqual(cases.ID.tolist(), self.cases.ID.tolist())
+        self.assertEqual(cases.source_excel_row.tolist(), [3, 2])
+        self.assertEqual(cases.psa_report_ref.tolist(), ['>5,0', ''])
+        self.assertEqual(cases.psa_consolidated.tolist(), [5., 12.])
+        self.assertEqual(cases.psa_source.tolist(), ['psa_report_ref', 'psa'])
+        self.assertEqual(cases.psa_selected_censored.tolist(), [True, False])
+        self.assertEqual(cases.cscancer.tolist(), ['unknown', 'Y'])
+        self.assertTrue(pd.isna(cases.pirads.iloc[0]))
+        self.assertEqual(cases.pirads.iloc[1], 3)
+        np.testing.assert_allclose(cases.workbook_reference_volume_ml, [50, 60])
+        np.testing.assert_allclose(cases.dimension_ellipsoid_volume_ml, np.pi / 6 * 60)
+        np.testing.assert_allclose(cases.clinical_volume_ml, cases.vol_report_ref)
+        np.testing.assert_allclose(cases.vol_report_ref, [40., 80.])
+
+    def test_ellipsoid_parses_decimal_commas_and_preserves_raw_dimensions(self):
+        for field, raw in [('dim1_report_ref', '3,5'), ('dim2_report_ref', '4,0'),
+                           ('dim3_report_ref', '5,0')]:
+            self.workbook[field] = self.workbook[field].astype(object)
+            self.workbook.loc[1, field] = raw
+        ns = self.namespace()
+        self.execute(LINKAGE, ns)
+        row = ns['cases'].iloc[0]
+        self.assertEqual(row.dim1_report_ref, '3,5')
+        self.assertAlmostEqual(row.dimension_ellipsoid_volume_ml, np.pi / 6 * 3.5 * 4 * 5)
+        self.assertEqual(row.clinical_volume_ml, 40.)
+
+    def test_invalid_dimensions_remain_diagnostic_without_excluding_cases(self):
+        original = self.workbook.copy()
+        fields = ['dim1_report_ref', 'dim2_report_ref', 'dim3_report_ref']
+        invalid_dimensions = [
+            tuple(value if index == axis else [3, 4, 5][index] for index in range(3))
+            for axis in range(3) for value in ['', None, 'bad', 0, -1, 'inf', '-inf']
+        ] + [(-3, -4, 5), (1e200, 1e200, 1e200), (1e-200, 1e-200, 1e-200)]
+        for values in invalid_dimensions:
+            with self.subTest(dimensions=values):
+                self.workbook = original.copy()
+                self.workbook[fields] = self.workbook[fields].astype(object)
+                self.workbook.loc[1, fields] = list(values)
+                ns = self.namespace()
+                self.execute(LINKAGE, ns)
+                audit = pd.read_csv(self.out / 'clinical_fields_audit.csv')
+                self.assertEqual(audit.ID.tolist(), self.cases.ID.tolist())
+                self.assertTrue(pd.isna(audit.dimension_ellipsoid_volume_ml.iloc[0]))
+                np.testing.assert_allclose(audit.clinical_volume_ml, self.cases.vol_report_ref)
+                np.testing.assert_allclose(ns['cases'].clinical_volume_ml, self.cases.vol_report_ref)
+
+    def test_extreme_dimensions_do_not_override_reported_volume(self):
+        self.workbook.loc[1, ['dim1_report_ref', 'dim2_report_ref', 'dim3_report_ref']] = [8., 96.5, 6.3]
+        ns = self.namespace()
+        self.execute(LINKAGE, ns)
+        self.assertAlmostEqual(ns['cases'].dimension_ellipsoid_volume_ml.iloc[0], np.pi / 6 * 8 * 96.5 * 6.3)
+        np.testing.assert_allclose(ns['cases'].clinical_volume_ml, self.cases.vol_report_ref)
+
+    def test_workbook_amrn_prefix_whitespace_and_leading_zeros(self):
+        self.cases.loc[0, 'amrn'] = '00123456'
+        self.cases.loc[0, 'ID'] = 'AIPR_00123456_20260101_s0'
+        for raw in ['AIPR_00123456', '  AIPR_00123456  ', '00123456', '  00123456  ']:
+            with self.subTest(raw=raw):
+                self.workbook.loc[1, 'amrn'] = raw
+                ns = self.namespace()
+                self.execute(LINKAGE, ns)
+                row = ns['cases'].iloc[0]
+                self.assertEqual(row.workbook_amrn_raw, raw)
+                self.assertEqual(row.workbook_amrn, '00123456')
+                self.assertTrue(row.amrn_matches)
+        for raw in ['AIPR_123456', 'AIPR_AIPR_00123456', 'other_00123456', 'AIPR_00123457']:
+            with self.subTest(raw=raw):
+                self.workbook.loc[1, 'amrn'] = raw
+                with self.assertRaisesRegex(AssertionError, 'amrn mismatch'):
+                    self.execute(LINKAGE, self.namespace())
+
+    def test_positive_psa_fallback_and_invalid_inputs_are_audited(self):
+        for report in ['', 'bad', '0', '-1', 'inf', '-inf']:
+            with self.subTest(report=report):
+                self.workbook.loc[1, 'psa_report_ref'] = report
+                ns = self.namespace()
+                self.execute(LINKAGE, ns)
+                self.assertEqual(ns['cases'].psa_consolidated.iloc[0], 99)
+                self.assertEqual(ns['cases'].psa_source.iloc[0], 'psa')
+        self.workbook.loc[1, 'psa'] = '-2'
+        with self.assertRaisesRegex(AssertionError, 'positive finite PSA'):
+            self.execute(LINKAGE, self.namespace())
+        audit = pd.read_csv(self.out / 'clinical_fields_audit.csv')
+        self.assertEqual(audit.psa_source.iloc[0], 'unavailable')
+
+    def test_haider_correction_keeps_raw_value_and_report_precedence(self):
+        self.cases.loc[0, 'aano'] = '333abfe652a8889'
+        self.workbook.loc[1, 'aano'] = '333abfe652a8889'
+        self.workbook.loc[1, 'psa'] = 'erroneous raw value'
+        for report, expected, source in [('', 28.9, 'psa'), ('7', 7., 'psa_report_ref')]:
+            self.workbook.loc[1, 'psa_report_ref'] = report
+            ns = self.namespace()
+            self.execute(LINKAGE, ns)
+            row = ns['cases'].iloc[0]
+            self.assertEqual(row.psa, 'erroneous raw value')
+            self.assertTrue(row.psa_correction_applied)
+            self.assertEqual(row.psa_consolidated, expected)
+            self.assertEqual(row.psa_source, source)
+
+    def test_bad_keys_missing_links_patient_mismatch_and_reference_stop(self):
+        original = self.workbook.copy()
+        for field, value, message, audit_file in [
+            ('aano', 's0', 'duplicate workbook aano', 'workbook_key_audit.csv'),
+            ('aano', '', 'Invalid or duplicate', 'workbook_key_audit.csv'),
+            ('aano', 'unmatched', 'linkage or amrn mismatch', 'clinical_fields_audit.csv'),
+            ('amrn', 'wrong', 'linkage or amrn mismatch', 'clinical_fields_audit.csv'),
+            ('p_axt2_ah_vol', 999, 'reference mismatch', 'clinical_fields_audit.csv'),
+            ('p_axt2_ah_vol', -1, 'invalid reader volumes', 'clinical_fields_audit.csv'),
+        ]:
+            with self.subTest(field=field, value=value):
+                self.workbook = original.copy()
+                self.workbook.loc[0, field] = value
+                with self.assertRaisesRegex(AssertionError, message):
+                    self.execute(LINKAGE, self.namespace())
+                self.assertTrue((self.out / audit_file).is_file())
+
+    def test_outcomes_remain_optional_and_unknown_is_not_negative(self):
+        for raw, expected in [('No', 'N'), ('Y confirmed', 'Y'), ('NOT KNOWN', 'unknown'),
+                              ('NOT AVAILABLE', 'unknown'), ('N/A', 'unknown'), ('?', 'unknown')]:
+            self.workbook.loc[0, 'CSCANCER'] = raw
+            self.workbook.loc[0, 'reportmaxpirads_ref'] = '2.5'
+            ns = self.namespace()
+            self.execute(LINKAGE, ns)
+            self.assertEqual(ns['cases'].cscancer.iloc[1], expected)
+            self.assertTrue(pd.isna(ns['cases'].pirads.iloc[1]))
+            self.assertEqual(len(ns['cases']), 2)
+
+    def test_density_units_same_numerator_and_zero_volume_audit(self):
+        ns = self.namespace()
+        self.execute(LINKAGE, ns)
+        ns.update(volumes=ns['cases'].assign(model_volume_ml=[25., 120.]),
+                  SELECTED_COMPARATORS=['clinical', 'model'])
+        self.execute(PSAD, ns)
+        density = ns['psad_cases']
+        np.testing.assert_allclose(density.gt_psad, [.1, .2])
+        np.testing.assert_allclose(density.model_psad, [.2, .1])
+        np.testing.assert_allclose(density.clinical_psad, [.125, .15])
+        ns['volumes'].loc[0, 'model_volume_ml'] = 0
+        with self.assertRaisesRegex(AssertionError, 'Invalid PSA-density inputs'):
+            self.execute(PSAD, ns)
+        audit = pd.read_csv(self.out / 'psa_density_cohort_audit.csv')
+        self.assertFalse(audit.psad_evaluable.iloc[0])
+        self.assertTrue(pd.isna(audit.model_psad.iloc[0]))
+        self.assertEqual(len(ns['volumes']), 2)
+
+    def test_runtime_loading_unencrypted_and_mock_encrypted_workbook(self):
+        path = self.out / 'source.xlsx'
+        self.workbook.to_excel(path, index=False)
+        ns = dict(WORKBOOK=path, pd=pd, msoffcrypto=msoffcrypto, BytesIO=BytesIO,
+                  getpass=Mock(return_value='synthetic-password'))
+        self.execute(LOADING, ns)
+        ns['getpass'].assert_not_called()
+        self.assertEqual(ns['workbook'].psa_report_ref.iloc[0], '')
+        payload = path.read_bytes()
+        office = Mock()
+        office.is_encrypted.return_value = True
+        buffers = []
+        def decrypt(buffer):
+            buffers.append(buffer)
+            buffer.write(payload)
+        office.decrypt.side_effect = decrypt
+        with patch.object(msoffcrypto, 'OfficeFile', return_value=office):
+            self.execute(LOADING, ns)
+        ns['getpass'].assert_called_once_with('Excel password: ')
+        office.load_key.assert_called_once_with(password='synthetic-password', verify_password=True)
+        self.assertNotIn('password', ns)
+        self.assertNotIn('office', ns)
+        self.assertTrue(buffers[0].closed)
+        office.load_key.side_effect = ValueError('Invalid synthetic password')
+        with patch.object(msoffcrypto, 'OfficeFile', return_value=office):
+            with self.assertRaisesRegex(ValueError, 'Invalid synthetic password'):
+                self.execute(LOADING, ns)
+        self.assertNotIn('password', ns)
+        self.assertNotIn('office', ns)
+
+
 class TorontoStatisticsTests(unittest.TestCase):
     def run_statistics(self, errors, references=None):
         n = len(next(iter(errors.values())))
         references = np.full(n, 50.) if references is None else np.asarray(references)
-        volumes = pd.DataFrame(dict(patient_id=np.arange(n), gt_volume_ml=references))
+        volumes = pd.DataFrame(dict(amrn=np.arange(n), gt_volume_ml=references))
         for key, values in errors.items():
             volumes[f'{key}_volume_ml'] = references + np.asarray(values)
         tree = ast.parse(STATISTICS)

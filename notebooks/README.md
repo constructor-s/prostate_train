@@ -3,6 +3,101 @@
 Run the Python cell notebooks from this directory (`notebooks/`); the repository
 root is assumed to be its parent.
 
+## Toronto JDMI volume agreement
+
+[toronto_jdmi_clinical_volume.py](toronto_jdmi_clinical_volume.py) compares clinical
+manual ellipsoid, Multicenter Dataset274, and RUMC Dataset236 volumes against
+median manual-reader planimetry. The cleaned cohort contains **383 scans from
+383 patients**, after accession exclusions and requiring positive finite manual
+reference volumes. Patient selection is performed upstream by
+`_hlab20260928_clinical_image_listing.py`; the analysis preserves that selection.
+
+Required private inputs under `data_internal/hlab20260928/` are
+`hlab20260928_t2_image_listing_full_clinical.csv`, `exclude.json`, the listed T2
+images, `PROSATELLMVOL20260703-12-WorkingBillShi.xlsx`, and saved masks plus dataset metadata in
+`seg_out_Dataset274_raw_3d_fullres_5fold/` and
+`seg_out_Dataset236_raw_3d_fullres_5fold/`. Supply the Excel password at runtime;
+the workbook is decrypted in memory. No downloads, training, or inference occurs.
+Run cells in order, or from the repository root:
+
+```bash
+MPLBACKEND=Agg .venv/bin/python notebooks/toronto_jdmi_clinical_volume.py
+```
+
+The notebook measures label-1 whole-gland volume on native grids in mL and
+requires prediction/T2 corner displacement <= 0.5 mm. Empty predictions retain
+zero volume; missing or invalid measurements stop analysis after a local audit.
+It reproduces the PROSTATEx volume summaries, agreement plots, paired error
+comparisons, and paired patient-level inference: 100,000 resamples, seed
+20261102, BCa intervals, null-centered bootstrap-t RMSE tests, exact sign tests,
+and Holm correction across the six primary tests. The training-derived JDMI
+model is outside this version.
+
+IDs have the structure `AIPR_{amrn}_{date}_{aano}`: `amrn` identifies the patient
+and `aano` identifies the examination/accession. Workbook linkage uses trimmed
+`aano` and verifies `amrn`, preserving selected scans and their order. The seven
+manual-reader measurements reconstruct the listing reference (CH zero is missing).
+Report dimensions in cm provide a separate π/6 ellipsoid diagnostic in mL.
+
+PSA parsing follows the Haider analysis (decimal commas and `>` removal, with
+censoring flagged). Preserve raw fields and apply its documented single-record
+alternative-PSA correction to an analytical copy. Use positive finite
+`psa_report_ref`, otherwise positive finite corrected `psa`; every selected case
+must receive usable PSA. Calculate reference and comparator PSAD using the same
+PSA divided by volume in mL, yielding ng/mL². Invalid density denominators stop
+the density section after an audit, without removing zero predictions from
+volume results. PI-RADS (`reportmaxpirads_ref`) and cancer outcome (`CSCANCER`)
+are normalized for biopsy analysis; unavailable outcomes do not exclude
+PSAD cases. Workbook key/linkage, reference, and PSA failures stop after audits.
+
+All outputs stay in Git-ignored `results/toronto_jdmi_clinical_volume/`:
+`cohort_audit.csv`, `cohort_flow.csv`, `measurement_audit.csv`,
+`comparator_volumes.csv`, `comparator_summary.csv`,
+`comparator_pairwise_per_case.csv`, `comparator_pairwise_counts.csv`,
+`comparator_pairwise_statistics.csv`, and `comparator_agreement.png`/`.pdf`.
+`run_metadata.json` records input SHA-256 checksums, saved model metadata,
+parameters, package versions, and the notebook checksum. It also pins cohort
+membership for subsequent runs; review and archive the prior output directory
+before intentionally establishing a changed cohort. Patient-level audits and
+metadata are private and must remain local; displayed tables and plots contain
+aggregate results without patient identifiers. Historical inference settings
+are recorded only where saved metadata is available.
+
+Additional local outputs are `workbook_key_audit.csv`, `clinical_fields_audit.csv`,
+`psa_density_cohort_audit.csv`, and `psa_density_per_case.csv`. Metadata includes
+the encrypted workbook checksum, PSA rule/source counts, correction and censoring
+counts, and outcome availability. Passwords and decrypted workbooks are not saved.
+
+The PSAD section reproduces PROSTATEx continuous summaries (bias, MAE, RMSE,
+RMSPE, MAPE, Pearson correlation and absolute/relative limits of agreement),
+logarithmic agreement plots, and empirical difference histograms. Reference PSAD
+uses median manual-reader planimetry. Unrounded strata are [0, 0.10),
+[0.10, 0.15), [0.15, 0.20), and [0.20, ∞); threshold comparisons use ≥0.10,
+≥0.15 and ≥0.20. Confusion rows are reference strata, columns estimated strata.
+Paired patient-level PSAD inference uses the same 100,000-resample settings as
+volume inference. RMSE and closer tests share a Holm family; RMSPE and exact
+McNemar stratum-accuracy tests have separate families. Sensitivity t-tests use
+analogous separate families. Confidence intervals are pointwise, not adjusted.
+
+Biopsy simulation selects normalized PI-RADS 3 only and recommends biopsy at
+unrounded PSAD ≥0.15 ng/mL² for planimetry and each selected comparator.
+`CSCANCER` Y/N supplies positive/negative outcomes; unknown outcomes are excluded
+only here. No ISUP grades are inferred and there is no fallback to the full
+cohort. Summaries report confusion counts, sensitivity, specificity, PPV, NPV,
+accuracy, recommended/avoided biopsies, and positive outcomes detected/missed.
+Confusion rows are CSCANCER outcomes and columns simulated decisions. This is a
+retrospective threshold simulation, not observed biopsy management. Undefined
+ratios are NaN; empty subgroups refresh zero-count tables and figures.
+
+Additional `psa_density_` outputs are `summary.csv`, `agreement.png`/`.pdf`,
+`confusion.csv`/`.png`/`.pdf`, `classification_summary.csv`, `per_stratum.csv`,
+`threshold_statistics.csv`, `stratum_pairwise_statistics.csv`,
+`pairwise_per_case.csv`, `pairwise_counts.csv`, and `pairwise_statistics.csv`.
+Biopsy outputs use `psa_density_biopsy_` followed by `audit.csv`, `per_case.csv`,
+`summary.csv`, and `confusion.csv`/`.png`/`.pdf`. Single-method runs refresh empty
+pairwise outputs. Run metadata records density cutoffs, statistical families,
+biopsy definitions and counts. Reported-marksheet-PSAD diagnostics are omitted.
+
 ## PI-CAI clinical volume and PSA density
 
 [picai_clinical_volume.py](picai_clinical_volume.py) starts with the full PI-CAI

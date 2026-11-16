@@ -11,7 +11,7 @@
 # masks. Training labels remain Bosma22b AI surrogate annotations. Exclude every
 # PROSTATEx-mapped patient from training, including ambiguous links and repeats.
 # Testing requires one mapped exam and a finite positive clinical ellipsoid
-# volume (mL) and adequate source-image prostate coverage: 189 of 193 mapped
+# volume (mL) and adequate source-image prostate coverage: 188 of 193 mapped
 # cases qualify. Record all exclusions in the audit.
 #
 # Run cells in order, or execute this file with the project Python environment.
@@ -184,6 +184,8 @@ assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_pat
 # touches the superior boundary, and approximately 12.42% (5.412 mL) of manual
 # reference volume lies outside the PI-CAI grid. Apply this case-level source
 # quality exclusion to every testing comparator, not only Bosma22b.
+# Visual review also excludes ProstateX-0042 (PI-CAI 10180_1000183): the large
+# prostate is poorly covered by the cropped field of view, for the same reason.
 # Review the generated candidate before manually copying it to the active
 # configs/rumcnotprostatexnoclinical_folds.json; this notebook does not update it.
 
@@ -220,7 +222,7 @@ testing['clinical_volume_ml'] = pd.to_numeric(testing['prostate_volume'], errors
 testing['has_valid_clinical_volume'] = (
     np.isfinite(testing['clinical_volume_ml']) & testing['clinical_volume_ml'].gt(0)
 )
-testing['has_source_image_quality_issue'] = testing['ID'].eq('ProstateX-0031')
+testing['has_source_image_quality_issue'] = testing['ID'].isin(['ProstateX-0031', 'ProstateX-0042'])
 testing['testing_eligible'] = (
     testing['mapping_count'].eq(1) & testing['has_marksheet_exam'] & testing['has_valid_clinical_volume']
     & ~testing['has_source_image_quality_issue']
@@ -252,7 +254,8 @@ display(testing_audit.loc[testing_audit['assignment'].eq('excluded'),
 # mapped identities, ProstateX-0025 has two mapped exams and is excluded rather
 # than choosing a volume arbitrarily (99.5 versus 95 mL). Of the remaining 192,
 # ProstateX-0071 and ProstateX-0149 have missing volumes, leaving 190 cases.
-# Exclude ProstateX-0031 for insufficient source-image coverage, leaving 189 testing cases.
+# Exclude ProstateX-0031 and ProstateX-0042 for insufficient source-image
+# prostate coverage, leaving 188 testing cases.
 
 # %%
 no_complete = audit.loc[~audit['patient_has_complete_exam']]
@@ -294,7 +297,7 @@ assert (len(eligible), len(training)) == (239, 236), 'RUMC training counts chang
 assert len(testing_audit) == 204, 'Local PROSTATEx index changed'
 assert testing_audit.mapping_count.gt(0).sum() == 193, 'Mapped PROSTATEx cohort changed'
 assert testing_audit.mapping_count.eq(1).sum() == 192, 'Unambiguous PROSTATEx cohort changed'
-assert len(testing) == 189, 'Quality- and volume-eligible PROSTATEx testing count changed'
+assert len(testing) == 188, 'Quality- and volume-eligible PROSTATEx testing count changed'
 assert not testing['has_source_image_quality_issue'].any(), 'Source-image quality exclusion failed'
 display(flow)
 display(audit.groupby('selection_reason').agg(examinations=('ID', 'size'), patients=('patient_id', 'nunique')))

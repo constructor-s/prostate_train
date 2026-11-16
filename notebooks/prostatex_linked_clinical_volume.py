@@ -16,7 +16,8 @@
 # supply the manual whole-gland masks and clinical measurements for this analysis.
 # Membership comes from the reviewed testing fold in
 # configs/rumcnotprostatexnoclinical_folds.json; metadata validates its cases.
-# ProstateX-0031 is excluded for insufficient source-image prostate coverage.
+# ProstateX-0031 and ProstateX-0042 are excluded for insufficient source-image
+# prostate coverage; the large gland in ProstateX-0042 is poorly covered by its crop.
 # Expected counts are recomputed below:
 #
 # | Stage | Examinations | Explanation |
@@ -26,13 +27,13 @@
 # | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
 # | Matched clinical marksheet | 192 | All remaining examinations match |
 # | Valid clinical volume before testing-fold selection | 190 | Two lack usable clinical volume |
-# | Reviewed testing fold: volume analysis | **189** | Exclude ProstateX-0031 for insufficient image coverage |
-# | PSA available: subsequent density analysis | **188** | ProstateX-0202 lacks PSA |
+# | Reviewed testing fold: volume analysis | **188** | Exclude ProstateX-0031 and ProstateX-0042 for insufficient image coverage |
+# | PSA available: subsequent density analysis | **187** | ProstateX-0202 lacks PSA |
 #
-# Keep all 189 selected volume cases, including suspicious records, for volume analysis.
+# Keep all 188 selected volume cases, including suspicious records, for volume analysis.
 # Only at the density step remove missing/nonfinite PSA. Eight cases with PSA
 # but missing reported PSAD remain in recalculated density comparisons. The
-# separate reported-PSAD diagnostic uses its 180 complete valid clinical triples.
+# separate reported-PSAD diagnostic uses its 179 complete valid clinical triples.
 # Flag |reported PSAD − PSA / clinical volume| > **0.01 ng/mL²** for review only
 # (22 current cases). This diagnostic threshold is not documented source precision
 # and a flag does not identify which clinical field, if any, is wrong.
@@ -135,7 +136,7 @@ cohort['in_testing_fold'] = cohort['ID'].isin(testing_ids)
 cohort['selection_status'] = np.where(cohort['in_testing_fold'], cohort['linkage_status'], 'not_in_testing_fold')
 cohort['exclusion_reason'] = np.where(cohort['in_testing_fold'], '', 'not_in_testing_fold')
 # This explains a documented exclusion; it does not independently select cases.
-quality_excluded = ~cohort['in_testing_fold'] & cohort['ID'].eq('ProstateX-0031')
+quality_excluded = ~cohort['in_testing_fold'] & cohort['ID'].isin(['ProstateX-0031', 'ProstateX-0042'])
 cohort.loc[quality_excluded, 'exclusion_reason'] = 'insufficient_source_image_prostate_coverage'
 cohort.to_csv(OUTPUT_DIR / 'cohort_linkage_audit.csv', index=False)
 linked = cohort.set_index('ID', drop=False).loc[testing_ids].copy().reset_index(drop=True)
@@ -169,7 +170,7 @@ for stage, frame, reason in [
     ('Valid clinical volume before testing-fold selection', cohort.loc[cohort.linkage_status.eq('included')],
      'Missing/nonfinite/nonpositive clinical volume'),
     ('Reviewed testing fold: volume analysis', linked,
-     'Not in reviewed testing fold; ProstateX-0031 has insufficient source-image prostate coverage'),
+     'Not in reviewed testing fold; ProstateX-0031 and ProstateX-0042 have insufficient source-image prostate coverage'),
     ('PSA available: subsequent density analysis', linked.loc[psa_available], 'Missing/nonfinite PSA'),
 ]:
     n_examinations = len(frame)
@@ -289,7 +290,7 @@ volumes = linked.merge(pd.DataFrame(reference_rows), on='ID', validate='one_to_o
 # standardized study's `prostatex_original_train_mapped` folders. Their saved
 # `inference_config.json` files document a five-fold ensemble (folds 0–4),
 # tile step 0.8, and disabled mirroring. Predictions are matched by PROSTATEx ID
-# and use whole-gland label 1. Each folder contains 193 masks; only the selected 189
+# and use whole-gland label 1. Each folder contains 193 masks; only the selected 188
 # eligible linked cases enter this analysis. Legacy Dataset609 remains optional
 # and uses its original prediction folder and historical inference settings.
 # PI-CAI masks are matched by patient/study ID.
@@ -449,6 +450,41 @@ volumes.to_csv(OUTPUT_DIR / 'comparator_volumes.csv', index=False)
 summary.to_csv(OUTPUT_DIR / 'comparator_summary.csv', index=False)
 
 # %% [markdown]
+# ## Manual–automated disagreement flags for quality improvement
+#
+# Screen manual ellipsoid versus nnUNet274 without using reference volume.
+# Relative disagreement uses the pair mean, unlike the reference-normalized
+# errors plotted below. The primary screen requires being strictly outside
+# mean ± 1.96 sample SD on BOTH scales. The same patients are highlighted in
+# every comparator panel; the plotted statistics still use the complete cohort.
+
+# %%
+disagreement_columns = ['ID', 'clinical_volume_ml', 'nnunet274_volume_ml']
+disagreement_screen_available = set(disagreement_columns) <= set(volumes.columns)
+if disagreement_screen_available:
+    disagreement = volumes[['ID', 'clinical_volume_ml', 'nnunet274_volume_ml']].copy()
+    disagreement['disagreement_ml'] = disagreement.clinical_volume_ml - disagreement.nnunet274_volume_ml
+    pair_mean = (disagreement.clinical_volume_ml + disagreement.nnunet274_volume_ml) / 2
+    assert np.isfinite(pair_mean).all() and pair_mean.gt(0).all()
+    disagreement['disagreement_percent'] = 100 * disagreement.disagreement_ml / pair_mean
+    for scale in ['ml', 'percent']:
+        values = disagreement[f'disagreement_{scale}']
+        lower_limit = values.mean() - 1.96 * values.std(ddof=1)
+        upper_limit = values.mean() + 1.96 * values.std(ddof=1)
+        disagreement[f'loa_lower_{scale}'] = lower_limit
+        disagreement[f'loa_upper_{scale}'] = upper_limit
+        disagreement[f'outside_{scale}'] = values.lt(lower_limit) | values.gt(upper_limit)
+    disagreement['outside_both'] = disagreement.outside_ml & disagreement.outside_percent
+    disagreement['outside_either'] = disagreement.outside_ml | disagreement.outside_percent
+    disagreement.to_csv(OUTPUT_DIR / 'manual_automated_disagreement_flags.csv', index=False)
+    strict_outliers = disagreement.outside_both.to_numpy()
+    print(f'Strict manual–nnUNet274 disagreement flags: {strict_outliers.sum()}/{len(disagreement)}')
+else:
+    # Other optional comparator selections retain their original plotting behavior.
+    strict_outliers = np.zeros(len(volumes), dtype=bool)
+    print('Disagreement highlighting requires clinical and nnunet274 comparators.')
+
+# %% [markdown]
 # ## Agreement plots and empirical difference distributions
 #
 # Columns separate methods; rows share y-axes within each measurement type.
@@ -504,6 +540,10 @@ for column, key in enumerate(SELECTED_COMPARATORS):
         gt, measured_volumes[key], color=style['color'], marker=style['marker'],
         label=f'{panel_name}\nPearson r = {metrics.pearson_r:.2f}', **scatter_options,
     )
+    ax.scatter(
+        gt[strict_outliers], measured_volumes.loc[strict_outliers, key],
+        color='#CC3377', marker=style['marker'], s=16, edgecolors='none', linewidths=0, alpha=1, zorder=5
+    )
     ax.plot([lower, upper], [lower, upper], 'k--')
     # Zero-volume failures remain in the statistics but cannot appear on a log axis.
     ax.set_yscale('log', nonpositive='mask')
@@ -527,6 +567,10 @@ for column, key in enumerate(SELECTED_COMPARATORS):
         ax.scatter(
             gt, differences, color=style['color'], marker=style['marker'],
             label=legend_label, **scatter_options,
+        )
+        ax.scatter(
+            gt[strict_outliers], differences[strict_outliers],
+            color='#CC3377', marker=style['marker'], s=16, edgecolors='none', linewidths=0, alpha=1, zorder=5
         )
         for level, linestyle in [(bias, '-'), (loa_lower, '--'), (loa_upper, '--')]:
             ax.axhline(level, color=style['color'], linestyle=linestyle, linewidth=.8)
@@ -577,7 +621,6 @@ for ax in axes.flat:
     if ax.axison:
         ax.tick_params(axis='both', labelsize=8, pad=1.5, labelbottom=True, labelleft=True)
         ax.legend(**legend_options)
-
 fig.savefig(OUTPUT_DIR / 'comparator_agreement.png', dpi=300)
 fig.savefig(OUTPUT_DIR / 'comparator_agreement.pdf')
 plt.show()
@@ -881,7 +924,7 @@ pairwise_statistics.to_csv(OUTPUT_DIR / 'comparator_pairwise_statistics.csv', in
 # A separate analysis at the end examines that reported value.
 #
 # Retain all volume-analysis cases in this audit, then remove missing/nonfinite
-# PSA only (currently ProstateX-0202), giving 188 density cases. Reported PSAD and
+# PSA only (currently ProstateX-0202), giving 187 density cases. Reported PSAD and
 # review flags do not affect eligibility. Finite PSA must be positive and reference
 # and selected-method volumes must be finite positive; unexpected invalid values
 # stop execution rather than silently shrink the cohort. These requirements allow

@@ -101,14 +101,17 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
     def test_source_quality_exclusion_retains_mapping_and_training_selection(self):
         namespace = self.select(
             [dict(patient_id=10804, study_id=1000820, psad=np.nan),
+             dict(patient_id=10180, study_id=1000183, psad=np.nan),
              dict(patient_id=2, study_id=200, psad=np.nan)],
             mapping={'ProstateX-0031_date': '10804_1000820',
+                     'ProstateX-0042_date': '10180_1000183',
                      'ProstateX-0001_date': '3_300'})
         training_before = namespace['training'].copy(deep=True)
         namespace.update(
-            prostatex=pd.DataFrame({'ID': ['ProstateX-0031', 'ProstateX-0001']}),
-            marksheet=pd.DataFrame({'patient_id': [10804, 3],
-                                    'study_id': [1000820, 300], 'prostate_volume': [50., 60.]}))
+            prostatex=pd.DataFrame({'ID': ['ProstateX-0031', 'ProstateX-0042', 'ProstateX-0001']}),
+            marksheet=pd.DataFrame({'patient_id': [10804, 10180, 3],
+                                    'study_id': [1000820, 1000183, 300],
+                                    'prostate_volume': [50., 196., 60.]}))
         exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
         self.assertEqual(namespace['testing'].ID.tolist(), ['ProstateX-0001'])
         row = namespace['testing_audit'].set_index('ID').loc['ProstateX-0031']
@@ -117,6 +120,12 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
         self.assertEqual(row.picai_key, '10804_1000820')
         self.assertTrue(row.has_valid_clinical_volume)
         self.assertTrue(row.has_source_image_quality_issue)
+        second = namespace['testing_audit'].set_index('ID').loc['ProstateX-0042']
+        self.assertEqual(second.assignment, 'excluded')
+        self.assertEqual(second.exclusion_reason, 'insufficient_source_image_prostate_coverage')
+        self.assertEqual(second.picai_key, '10180_1000183')
+        self.assertTrue(second.has_source_image_quality_issue)
+        self.assertTrue(second.has_valid_clinical_volume)
         pd.testing.assert_frame_equal(namespace['training'], training_before)
         self.assertEqual(namespace['training'].patient_id.tolist(), [2])
 

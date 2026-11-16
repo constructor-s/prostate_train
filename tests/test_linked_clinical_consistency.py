@@ -118,30 +118,67 @@ class LinkedClinicalConsistencyTests(unittest.TestCase):
             'ambiguous_date1': '1_1', 'ambiguous_date2': '1_2',
             'valid_date': '2_1', 'missingpsa_date': '3_1',
             'missingvolume_date': '4_1', 'unmatched_date': '5_1', 'nomask_date': '6_1',
+            'ProstateX-0031_date': '10804_1000820',
         }
         index_path = self.output / 'index.csv'
         mapping_path = self.output / 'mapping.json'
         marksheet_path = self.output / 'marksheet.csv'
         mapping_path.write_text(json.dumps(mapping))
-        pd.DataFrame({'ID': ['ambiguous', 'valid', 'missingpsa', 'missingvolume', 'unmatched', 'unmapped']}).to_csv(
+        ids = ['ambiguous', 'valid', 'missingpsa', 'missingvolume', 'unmatched', 'unmapped', 'ProstateX-0031']
+        pd.DataFrame({'ID': ids, 't2': [f'{case}.nii.gz' for case in ids],
+                      'label_wg': [f'{case}_mask.nii.gz' for case in ids]}).to_csv(
             index_path, index=False,
         )
-        pd.DataFrame(dict(patient_id=[2, 3, 4], study_id=[1, 1, 1],
-                          prostate_volume=[50, 60, np.nan], psa=[5, np.nan, 3],
-                          psad=[.1, np.nan, .1])).to_csv(marksheet_path, index=False)
+        pd.DataFrame(dict(patient_id=[2, 3, 4, 10804], study_id=[1, 1, 1, 1000820],
+                          prostate_volume=[50, 60, np.nan, 40], psa=[5, np.nan, 3, 4],
+                          psad=[.1, np.nan, .1, .1])).to_csv(marksheet_path, index=False)
+        manifest_path = self.output / 'folds.json'
+        def entry(case):
+            return dict(id=case, image=f'{case}.nii.gz', label=f'{case}_mask.nii.gz')
+        manifest = {'testing': [entry('valid'), entry('missingpsa')],
+                    'excluded': [entry('ProstateX-0031')]}
+        manifest_path.write_text(json.dumps(manifest))
         displays = []
         ns = dict(np=np, pd=pd, json=json, INDEX_PATH=index_path, MAPPING_PATH=mapping_path,
-                  MARKSHEET_PATH=marksheet_path, OUTPUT_DIR=self.output, EXPECTED_CASES=2,
+                  MARKSHEET_PATH=marksheet_path, OUTPUT_DIR=self.output,
+                  TESTING_MANIFEST_PATH=manifest_path, DATA_ROOT=self.output, MASK_ROOT=self.output,
                   display=lambda value: displays.append(value.copy()))
         with redirect_stdout(StringIO()):
             exec(compile(LINKAGE_SOURCE, str(NOTEBOOK), 'exec'), ns)
         flow = pd.read_csv(self.output / 'cohort_flow.csv')
-        self.assertEqual(flow.n_examinations.tolist(), [7, 6, 4, 3, 2, 1])
-        self.assertEqual(flow.n_patients.tolist(), [6, 5, 4, 3, 2, 1])
-        self.assertEqual(flow.excluded_examinations.iloc[1:].tolist(), [1, 2, 1, 1, 1])
-        self.assertEqual(flow.excluded_patients.iloc[1:].tolist(), [1, 1, 1, 1, 1])
+        self.assertEqual(flow.n_examinations.tolist(), [8, 7, 5, 4, 3, 2, 1])
+        self.assertEqual(flow.n_patients.tolist(), [7, 6, 5, 4, 3, 2, 1])
+        self.assertEqual(flow.excluded_examinations.iloc[1:].tolist(), [1, 2, 1, 1, 1, 1])
+        self.assertEqual(flow.excluded_patients.iloc[1:].tolist(), [1, 1, 1, 1, 1, 1])
         self.assertEqual(ns['linked'].ID.tolist(), ['valid', 'missingpsa'])
         pd.testing.assert_frame_equal(displays[0], ns['cohort_flow'])
+        excluded = ns['cohort'].set_index('ID').loc['ProstateX-0031']
+        self.assertEqual(excluded.selection_status, 'not_in_testing_fold')
+        self.assertEqual(excluded.exclusion_reason, 'insufficient_source_image_prostate_coverage')
+        self.assertEqual(excluded.picai_key, '10804_1000820')
+        self.assertEqual(ns['EXPECTED_CASES'], 2)
+        # Manifest order is authoritative, independent of index order.
+        manifest['testing'].reverse()
+        manifest_path.write_text(json.dumps(manifest))
+        with redirect_stdout(StringIO()):
+            exec(compile(LINKAGE_SOURCE, str(NOTEBOOK), 'exec'), ns)
+        self.assertEqual(ns['linked'].ID.tolist(), ['missingpsa', 'valid'])
+        failures = [
+            ([entry('valid'), entry('valid')], 'duplicate testing IDs'),
+            ([entry('unknown')], 'missing from local mask index'),
+            ([entry('missingvolume')], 'Invalid testing-case linkage'),
+            ([entry('unmatched')], 'Invalid testing-case linkage'),
+            ([dict(entry('valid'), image='wrong.nii.gz')], 'image path mismatch'),
+            ([dict(entry('valid'), label='wrong_mask.nii.gz')], 'manual-mask path mismatch'),
+            ([entry('ProstateX-0031')], 'Testing/excluded overlap'),
+        ]
+        for testing, message in failures:
+            with self.subTest(message=message):
+                manifest['testing'] = testing
+                manifest_path.write_text(json.dumps(manifest))
+                with redirect_stdout(StringIO()), self.assertRaisesRegex(AssertionError, message):
+                    exec(compile(LINKAGE_SOURCE, str(NOTEBOOK), 'exec'), ns)
+
 
 
 if __name__ == '__main__':

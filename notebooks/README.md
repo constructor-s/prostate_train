@@ -248,12 +248,14 @@ comparison tables and figures, go to
 ## Linked PROSTATEx clinical-volume analysis
 
 [prostatex_linked_clinical_volume.py](prostatex_linked_clinical_volume.py) reconstructs
-the 190-case linked volume-analysis cohort, retains all clinical marksheet fields, and compares
+the reviewed testing cohort (currently 189 cases), retains all clinical marksheet fields, and compares
 clinical prostate volume with manual whole-gland segmentation volume in mL.
 Outputs are written to [results/prostatex_linked_volume](../results/prostatex_linked_volume/).
 
 Inputs:
 
+- [Reviewed testing manifest](../configs/rumcnotprostatexnoclinical_folds.json):
+  `testing` defines cohort membership and order; `excluded` retains reviewed exclusions.
 - [PROSTATEx mask index](../data/raw/github/prostatex_masks/index.csv): image paths
   and manual whole-gland masks (`label_wg`), relative to the index directory.
 - [PROSTATEx–PI-CAI mapping](../data/raw/zenodo/picai/picai_labels/additional_resources/ProstateX-mapping.json):
@@ -270,19 +272,27 @@ examination and unique-patient counts and exclusions relative to each preceding 
 | Local manual whole-gland mask available | 194 | 134 mapped examinations lack a local mask |
 | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
 | Matched clinical marksheet | 192 | All remaining examinations match |
-| Valid clinical volume: volume analysis | **190** | Two lack usable clinical volume |
-| PSA available: subsequent density analysis | **189** | ProstateX-0202 lacks PSA |
+| Valid clinical volume before testing-fold selection | 190 | Two lack usable clinical volume |
+| Reviewed testing fold: volume analysis | **189** | ProstateX-0031 excluded for insufficient source-image coverage |
+| PSA available: subsequent density analysis | **188** | ProstateX-0202 lacks PSA |
 
-Clinical consistency is assessed for the 181 complete valid PSA/volume/reported-PSAD
+The testing fold is authoritative; metadata validates rather than expands it.
+Duplicate or missing selected IDs, invalid clinical linkage or volume, and
+image/manual-mask paths inconsistent with the index stop execution. The full
+linkage audit retains cases outside the testing fold. ProstateX-0031 records
+`insufficient_source_image_prostate_coverage` following visual quality review.
+Clinical consistency flags remain review-only and do not remove selected cases.
+
+Clinical consistency is assessed for the 180 complete valid PSA/volume/reported-PSAD
 triples. Flag **|reported PSAD − PSA / clinical volume| > 0.01 ng/mL²** for review
 only; equality passes, allowing numerical roundoff. The threshold is configurable
-and is not documented source precision. Current inputs flag **23 cases**, including
+and is not documented source precision. Current inputs flag **22 cases**, including
 ProstateX-0037. Missing/invalid clinical assessments have separate statuses. No review
 flag or missing reported PSAD excludes a case from volume or recalculated density
 analysis, and a flag does not establish which field, if any, is wrong.
 
 The top cells export `cohort_flow.csv`, `cohort_linkage_audit.csv`, and the complete
-190-case `clinical_consistency_audit.csv`. All 190 cases are measured once and
+189-case `clinical_consistency_audit.csv`. All 189 selected cases are measured once and
 retained in both `comparator_volumes_all_cases.csv` and `comparator_volumes.csv`.
 `clinical_suspicious_cases.csv` contains a compact table of every flagged case;
 `clinical_case_review.csv` preserves their complete marksheet fields, identifiers,
@@ -340,7 +350,7 @@ historical checkpoints or ensemble folds produced the masks. The five-fold
 settings above describe the exported bundle configuration.
 
 For the linked PROSTATEx notebook, use the **PROSTATEx prediction directory** and
-match by PROSTATEx ID. All 190 cases already have predictions, so no new inference
+match by PROSTATEx ID. All 189 selected cases already have predictions, so no new inference
 is needed. The notebook calculates Dataset274 and Dataset609 label-1 whole-gland volumes in
 mL on each prediction's native grid, and compares both clinical and model volumes
 against ground truth. Per-case exports include prediction paths, voxel counts,
@@ -361,7 +371,7 @@ and are matched by PROSTATEx ID. Both model sources validate dataset identity an
 binary label metadata before measuring whole-gland label 1. Bosma22b remains
 optional, labeled **Bosma22b**, with its own plotting style.
 Clinical volume comes from the marksheet. HeviAI23 and Yuan23 whole gland is the union of labels 1 and 2.
-Volume comparisons retain all 190 cases, including suspicious records; masks are
+Volume comparisons retain all 189 selected cases, including suspicious records; masks are
 measured on native grids without resampling. This evaluates volume accuracy, not spatial overlap.
 
 The generic outputs replace the former hardcoded comparison outputs:
@@ -424,8 +434,8 @@ The same notebook continues with PSA density = PSA (ng/mL) / volume (mL), in
 Each selected comparator uses that same PSA with its own volume measurement.
 The marksheet's reported `psad` is examined separately at the end.
 
-The density audit retains all 190 volume-analysis cases. At this step, remove only
-missing/nonfinite PSA (currently ProstateX-0202), leaving **189 density cases**.
+The density audit retains all 189 selected volume-analysis cases. At this step, remove only
+missing/nonfinite PSA (currently ProstateX-0202), leaving **188 density cases**.
 The eight cases with PSA but missing reported PSAD remain eligible, as do all
 suspicious records. Finite PSA must be positive and reference and selected-method
 volumes must be finite positive: unexpected nonpositive PSA or invalid/empty-volume
@@ -476,12 +486,12 @@ New files under `results/prostatex_linked_volume/`:
 
 ## Reported marksheet PSA density
 
-The reported-density cells use the complete 190-case volume cohort, including suspicious
+The reported-density cells use the complete 189-case volume cohort, including suspicious
 records, for separately labeled reporting diagnostics. They compare reported
 `psad` against **PSA / clinical volume** and
 **PSA / manual-mask volume**. They also compare recalculated clinical density with
 manual-mask density on the same complete cases. This subset is independent of
-prediction-method selection; current inputs provide **181 complete reported-density
+prediction-method selection; current inputs provide **180 complete reported-density
 cases**. The audit records missing/invalid reports separately. Nonnegative
 reported density is valid; a zero report has undefined implied volume and is
 omitted from log-density display, but remains in statistics and strata.
@@ -548,6 +558,22 @@ without tissue sampling or follow-up. These results describe the selected cohort
 and do not establish routine-care performance or prevalence.
 
 ## Study segmentation performance
+
+The study notebook also compares supplied **Bosma22b** whole-gland label-1
+masks with the same 190 ProstateX manual references using `ProstateX-mapping.json`.
+It runs no inference for this comparator and exports mean DSC, MAE/RMSE (mL),
+and MAPE/RMSPE (%). Missing or ambiguous mappings and invalid geometry are
+audited; aggregates require complete coverage. Bosma22b masks are reoriented to
+canonical axes, with nearest-neighbor resampling onto the manual grid when
+resolutions or physical crops differ, using stored affines without fitting a
+registration. Different field boundaries are permitted; nonoverlapping grids
+are rejected. Voxels outside source coverage are background, so missed reference
+anatomy contributes to DSC error. Volume errors use native-grid counts and voxel
+volumes. All 190 cases evaluate successfully. Source-image diagnostics confirmed
+that the 18 differing crops match their PI-CAI Bosma22b source grids; these were
+not established patient-mapping errors.
+Bosma22b training membership
+is unverified, so these results carry no training designation. Other rows are NA.
 
 [model_study_performance.py](model_study_performance.py) evaluates the five-fold
 Dataset274 and Dataset236 ensembles. DSC, volume RMSE (mL), and case-count tables

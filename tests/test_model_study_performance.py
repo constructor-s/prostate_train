@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import nibabel as nib
+from nibabel.processing import resample_from_to
 import numpy as np
 import pandas as pd
 import yaml
@@ -75,7 +76,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             {'labels': {'background': 0, 'class1': 1}}))
         self.tables = self.root / 'tables'
         self.tables.mkdir()
-        self.ns = dict(nib=nib, np=np, pd=pd, Path=Path, json=json, shlex=shlex,
+        self.ns = dict(resample_from_to=resample_from_to, nib=nib, np=np, pd=pd, Path=Path, json=json, shlex=shlex,
                        itertools=itertools, yaml=yaml, REPO_ROOT=self.root,
                        GEOMETRY_TOLERANCE_MM=0.5, BUNDLE=self.bundle,
                        GEOMETRY_WARNING_THRESHOLD_MM=1e-3,
@@ -115,6 +116,91 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             exec(compile(WORKFLOW, str(NOTEBOOK), 'exec'), self.ns)
         self.output = output.getvalue()
         return self.ns['cohort_audit'].iloc[0]
+
+    def test_alignment_reorients_arrays_and_preserves_native_volumes(self):
+        data = np.zeros((2, 2, 2), dtype=np.uint8)
+        data[0, 0, 0] = 1
+        ref = self.mask('reference.nii.gz', data)
+        image = nib.load(ref)
+        flipped = image.as_reoriented(np.array([[0, 1], [1, -1], [2, 1]]))
+        pred = self.root / 'flipped.nii.gz'
+        nib.save(flipped, pred)
+        measure = self.ns['measure_masks']
+        with self.assertRaisesRegex(ValueError, 'Geometry displacement'):
+            measure(pred, ref)
+        result = measure(pred, ref, align_geometry=True)
+        self.assertEqual(result['dsc'], 1)
+        self.assertEqual(result['geometry_alignment'], 'canonical_reorientation')
+        self.assertAlmostEqual(result['predicted_volume_ml'], .024)
+        shifted = flipped.affine.copy()
+        shifted[0, 3] += 10
+        nib.save(nib.Nifti1Image(flipped.get_fdata(), shifted, flipped.header), pred)
+        with self.assertRaisesRegex(ValueError, 'fields of view do not overlap'):
+            measure(pred, ref, align_geometry=True)
+
+    def test_alignment_resamples_offset_crops_using_stored_world_transform(self):
+        data = np.zeros((4, 4, 4), dtype=np.uint8)
+        data[1:3, 1:3, 1:3] = 1
+        ref = self.mask('crop_ref.nii.gz', data, np.eye(4))
+        shifted = np.eye(4)
+        shifted[0, 3] = 1
+        pred_data = np.zeros_like(data)
+        pred_data[0:2, 1:3, 1:3] = 1
+        pred = self.mask('crop_pred.nii.gz', pred_data, shifted)
+        result = self.ns['measure_masks'](pred, ref, align_geometry=True)
+        self.assertEqual(result['dsc'], 1)
+        self.assertEqual(result['geometry_alignment'], 'canonical_resample_nearest')
+        self.assertEqual(result['max_corner_displacement_mm'], 1)
+        self.assertAlmostEqual(result['predicted_volume_ml'], .008)
+        # Reference foreground outside source coverage remains a false negative.
+        data[0, 1, 1] = 1
+        self.mask('crop_ref.nii.gz', data, np.eye(4))
+        result = self.ns['measure_masks'](pred, ref, align_geometry=True)
+        self.assertAlmostEqual(result['dsc'], 16 / 17)
+
+    def test_alignment_resamples_different_resolution_for_dsc_only(self):
+        ref = self.mask('reference.nii.gz')
+        affine = np.diag([1., 1.5, 4., 1.])
+        pred = self.mask('fine.nii.gz', np.ones((3, 3, 2), dtype=np.uint8), affine)
+        result = self.ns['measure_masks'](pred, ref, align_geometry=True)
+        self.assertEqual(result['dsc'], 1)
+        self.assertEqual(result['geometry_alignment'], 'canonical_resample_nearest')
+        self.assertAlmostEqual(result['predicted_volume_ml'], 18 * 6 / 1000)
+        self.assertAlmostEqual(result['reference_volume_ml'], 8 * 24 / 1000)
+
+    def test_bosma_mapping_saved_masks_and_complete_metrics(self):
+        source = self.cohort(predictions=0)
+        root = self.root / 'data/raw/zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b'
+        root.mkdir(parents=True)
+        self.ns.update(prostatex_source=source, COHORTS=[], MAPPING_PATH=self.root / 'mapping.json',
+                       links=pd.DataFrame({'id': ['case0', 'case1'],
+                                           'mapped_exam': ['10_20', '11_21']}))
+        section = SOURCE[SOURCE.index('BOSMA_ROOT ='):SOURCE.index(
+            '# %% [markdown]\n# ## Whole-gland measurements')]
+        exec(compile(section, str(NOTEBOOK), 'exec'), self.ns)
+        comparator = self.ns['COHORTS'][0]
+        self.assertTrue(comparator['saved_mask_only'])
+        self.assertEqual(Path(comparator['rows'][0]['prediction_path']).name, '10_20.nii.gz')
+        self.assertFalse(self.evaluate(comparator).complete)
+        self.ns['input'].assert_not_called()
+        for exam in ('10_20', '11_21'):
+            self.mask(str(root.relative_to(self.root) / f'{exam}.nii.gz'))
+        audit = self.evaluate(comparator)
+        self.assertTrue(audit.complete)
+        self.assertEqual((audit.evaluated, audit.expected, audit.unexpected), (2, 2, 0))
+        self.assertEqual(self.ns['dsc_table'].iloc[0, 0], 1)
+        for table in ('mae_table', 'rmse_table', 'mape_table', 'rmspe_table'):
+            self.assertEqual(self.ns[table].iloc[0, 0], 0)
+        for ids in (['case0'], ['case0', 'case1', 'case1']):
+            self.ns.update(COHORTS=[], links=pd.DataFrame(
+                {'id': ids, 'mapped_exam': ['10_20'] * len(ids)}))
+            exec(compile(section, str(NOTEBOOK), 'exec'), self.ns)
+            audit = self.evaluate(self.ns['COHORTS'][0])
+            self.assertFalse(audit.complete)
+            self.assertEqual(audit.invalid, 1)
+            self.assertIn('Missing or ambiguous', self.ns['per_case'].iloc[1].error)
+            self.assertTrue(self.ns['dsc_table'].isna().all().all())
+        self.ns['input'].assert_not_called()
 
     def test_clinical_rmse_coverage_and_invalid_masks(self):
         clinical = self.root / 'data_internal/hlab20260928'
@@ -220,7 +306,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             dict(id='ProstateX-0000', image=str(image))])
         self.ns['COHORTS'] = [source, *cohorts]
         ellipsoid_section = SOURCE[SOURCE.index("ELLIPSOID_NAME ="):SOURCE.index(
-            '# %% [markdown]\n# ## Whole-gland measurements')]
+            '# %% [markdown]\n# ## Bosma22b against manual ProstateX references')]
         with contextlib.redirect_stdout(io.StringIO()):
             exec(compile(ellipsoid_section, str(NOTEBOOK), 'exec'), self.ns)
         self.assertEqual([row['id'] for row in self.ns['COHORTS'][-1]['rows']], retained)
@@ -421,7 +507,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
         cohort['rows'][1]['id'] = 'ProstateX-0001'
         self.ns.update(COHORTS=[cohort], CLINICAL_CSV=self.root / 'clinical.csv',
                        clinical_cases=pd.DataFrame(columns=['ID', 'image_path', 'ground_truth_volume_ml', 'vol_report_ref']))
-        section = SOURCE[SOURCE.index("ELLIPSOID_NAME ="):SOURCE.index('# %% [markdown]\n# ## Whole-gland measurements')]
+        section = SOURCE[SOURCE.index("ELLIPSOID_NAME ="):SOURCE.index('# %% [markdown]\n# ## Bosma22b against manual ProstateX references')]
         exec(compile(section, str(NOTEBOOK), 'exec'), self.ns)
         rows = self.ns['COHORTS'][1]['rows']
         self.assertEqual(rows[0]['predicted_volume_ml'], 20)
@@ -556,7 +642,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             affine[0, 3] = offset
             self.mask(f'predictions/case{i}.nii.gz', affine=affine)
         self.assertTrue(self.evaluate(cohort).complete)
-        marker = 'WARNING: Evaluated cases with prediction/reference geometry displacement'
+        marker = 'WARNING: Evaluated cases with prediction/reference grid displacement'
         self.assertEqual(self.output.count(marker), 1)
         report = self.output.split(marker)[1]
         self.assertNotIn('case0', report)
@@ -800,7 +886,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             (self.root / f'configs/{config}_input.yaml').write_text(
                 f'datalist: configs/{config}_folds.json\ndataroot: data\n')
             (self.root / f'configs/{config}_folds.json').write_text(
-                json.dumps({'training': [], 'testing': []}))
+                json.dumps({'training': [], 'testing': [], 'endorectal_coil': []}))
         for model in self.ns['MODELS']:
             target = self.root / 'bundles' / model['name'] / 'models'
             target.mkdir(parents=True)
@@ -808,11 +894,12 @@ class ModelStudyPerformanceTests(unittest.TestCase):
         self.ns['STUDY_ROOT'] = self.root / 'study'
         exec(compile(COMMANDS, str(NOTEBOOK), 'exec'), self.ns)
         cohorts = self.ns['COHORTS']
-        self.assertEqual(len(cohorts), 6)
-        self.assertEqual(len({c['output'] for c in cohorts}), 6)
-        self.assertEqual([(c['dataset'], c['split']) for c in cohorts[3:]], [
+        self.assertEqual(len(cohorts), 8)
+        self.assertEqual(len({c['output'] for c in cohorts}), 8)
+        self.assertEqual([(c['dataset'], c['split']) for c in cohorts[4:]], [
             ('rumcnotprostatexnoclinical', 'training'),
-            ('rumcnotprostatexnoclinical', 'testing'), ('pooled2', 'testing')])
+            ('rumcnotprostatexnoclinical', 'testing'), ('pooled2', 'testing'),
+            ('pooled2', 'endorectal_coil')])
         for cohort in cohorts:
             argv = cohort['argv']
             self.assertEqual(argv[1], f"bundles/{cohort['model']}/scripts/infer.py")
@@ -825,7 +912,7 @@ class ModelStudyPerformanceTests(unittest.TestCase):
             exec(compile(WORKFLOW, str(NOTEBOOK), 'exec'), self.ns)
         table = self.ns['counts_table']
         self.assertEqual(table.index.names, ['Dataset', 'Split'])
-        self.assertEqual(table.shape, (4, 2))
+        self.assertEqual(table.shape, (5, 2))
         self.assertEqual(table.loc[('rumcnotprostatexnoclinical', 'training')].tolist(), ['NA', '0/0'])
         self.assertEqual(table.loc[('pooled2', 'testing')].tolist(), ['0/0', '0/0'])
         self.assertIn('| Dataset | Split |', (self.tables / 'dsc.md').read_text())

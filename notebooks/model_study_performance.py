@@ -32,6 +32,7 @@ import subprocess
 import time
 
 import nibabel as nib
+from nibabel.processing import resample_from_to
 import numpy as np
 import pandas as pd
 import yaml
@@ -243,12 +244,46 @@ COHORTS.append(dict(
 ))
 
 # %% [markdown]
+# ## Bosma22b against manual ProstateX references
+#
+# Supplied whole-gland label-1 masks are compared with the same manual masks.
+# No inference is run. Bosma22b training membership is unverified.
+# Reorient both masks to canonical axes. Different physical crops and resolutions
+# are resampled onto the manual grid with nearest-neighbor interpolation using
+# stored affines, with background outside source coverage. No registration is
+# fitted. Volumes retain native voxel counts and determinants. Nonoverlapping
+# fields of view remain invalid. Source-image diagnostics confirm that Bosma22b
+# uses the mapped record-6624726 image grid; field boundaries need not match.
+
+# %%
+BOSMA_ROOT = REPO_ROOT / 'data/raw/zenodo/picai/picai_labels/anatomical_delineations/whole_gland/AI/Bosma22b'
+bosma_rows = []
+for row in prostatex_source['rows']:
+    matches = links.loc[links.id.eq(row['id']), 'mapped_exam']
+    unambiguous = len(matches) == 1
+    exam = matches.iloc[0] if unambiguous else ''
+    bosma_rows.append(dict(
+        row, prediction_path=str(BOSMA_ROOT / f'{exam}.nii.gz'),
+        mapped_exam=','.join(matches), source_file=str(MAPPING_PATH),
+        source_error='' if unambiguous else 'Missing or ambiguous PROSTATEx mapping',
+    ))
+COHORTS.append(dict(
+    key=prostatex_source['key'], dataset=prostatex_source['dataset'], split=prostatex_source['split'],
+    reference_type='segmentation_mask', model='Bosma22b',
+    run_id=('Bosma22b', prostatex_source['key']), title='Bosma22b: PROSTATEx manual reference',
+    data_root=prostatex_source['data_root'], rows=bosma_rows,
+    output=BOSMA_ROOT, saved_mask_only=True, foreground_labels=(1,), align_geometry=True,
+))
+
+# %% [markdown]
 # ## Whole-gland measurements
 #
 # Compare corresponding voxel corners in physical millimetres (maximum Euclidean
 # displacement). Equal shapes with displacement <= 0.5 mm are accepted as small
 # header discrepancies and recorded. Larger differences are invalid, without
-# resampling. Volumes use each mask's native affine determinant, converted from
+# resampling by default. Bosma22b explicitly enables canonical reorientation and
+# nearest-neighbor resampling for different resolutions or physical crops using
+# stored affines. Nonoverlapping fields of view are invalid. Volumes use native affines, converted from
 # mm³ to mL. DSC is 2|prediction ∩ reference| / (|prediction| + |reference|).
 # Empty predictions have zero volume; empty segmentation references are invalid.
 # Clinical geometry uses the T2 image; clinical reference volumes have no DSC.
@@ -278,16 +313,45 @@ def measure_reported_volume(predicted_ml, reference_path=None, reference_ml=None
                 volume_error_ml=error, squared_volume_error_ml2=error ** 2)
 
 
-def measure_masks(prediction_path, reference_path, clinical_volume_ml=None, foreground_labels=(1,)):
+def measure_masks(prediction_path, reference_path, clinical_volume_ml=None, foreground_labels=(1,),
+                  align_geometry=False):
     """One directly testable calculation, shared by every cohort."""
     pred_img, ref_img = nib.load(prediction_path), nib.load(reference_path)
-    if len(pred_img.shape) != 3 or pred_img.shape != ref_img.shape:
+    if len(pred_img.shape) != 3 or len(ref_img.shape) != 3:
+        raise ValueError('Masks must be 3D')
+    if not align_geometry and pred_img.shape != ref_img.shape:
         raise ValueError('Mask shapes differ or are not 3D')
     for img in (pred_img, ref_img):
         if img.header.get_xyzt_units()[0] != 'mm':
             raise ValueError('Mask spatial units must be mm')
         if not np.isfinite(img.affine).all() or abs(np.linalg.det(img.affine[:3, :3])) <= 0:
             raise ValueError('Invalid mask affine')
+    # Preserve native-grid volume measurements; alignment affects DSC only.
+    native_pred_img = pred_img
+    if align_geometry:
+        pred_img = nib.as_closest_canonical(pred_img)
+        ref_img = nib.as_closest_canonical(ref_img)
+        pred_corners = np.array(list(itertools.product(*[(0, n - 1) for n in pred_img.shape])))
+        ref_corners = np.array(list(itertools.product(*[(0, n - 1) for n in ref_img.shape])))
+        field_displacement = np.linalg.norm(
+            nib.affines.apply_affine(pred_img.affine, pred_corners)
+            - nib.affines.apply_affine(ref_img.affine, ref_corners), axis=1,
+        ).max()
+        # Different crops may represent the same mapped examination. Use the
+        # stored world transform, never fit a transform to the reference mask.
+        mapped_corners = nib.affines.apply_affine(
+            np.linalg.inv(ref_img.affine) @ pred_img.affine, pred_corners)
+        if np.any(mapped_corners.max(axis=0) < -0.5) or np.any(
+            mapped_corners.min(axis=0) > np.array(ref_img.shape) - 0.5
+        ):
+            raise ValueError('Physical image fields of view do not overlap')
+        native_data = np.asanyarray(native_pred_img.dataobj)
+        if not np.isin(native_data, [0, *foreground_labels]).all():
+            raise ValueError('Unexpected native prediction labels')
+        needs_resampling = (pred_img.shape != ref_img.shape
+                            or field_displacement > GEOMETRY_TOLERANCE_MM)
+        if needs_resampling:
+            pred_img = resample_from_to(pred_img, (ref_img.shape, ref_img.affine), order=0)
     corners = np.array(list(itertools.product(*[(0, n - 1) for n in ref_img.shape])))
     displacement = np.linalg.norm(
         nib.affines.apply_affine(pred_img.affine, corners)
@@ -301,8 +365,9 @@ def measure_masks(prediction_path, reference_path, clinical_volume_ml=None, fore
             raise ValueError('Expected binary whole-gland labels 0 and 1')
         raise ValueError(f'Expected whole-gland labels 0 and {foreground_labels}')
     pred = np.isin(pred, foreground_labels)
-    pred_n = int(pred.sum())
-    pred_ml = pred_n * abs(np.linalg.det(pred_img.affine[:3, :3])) / 1000
+    overlap_pred_n = int(pred.sum())
+    pred_n = int(np.isin(np.asanyarray(native_pred_img.dataobj), foreground_labels).sum())
+    pred_ml = pred_n * abs(np.linalg.det(native_pred_img.affine[:3, :3])) / 1000
     if clinical_volume_ml is not None:
         if not np.isfinite(clinical_volume_ml) or clinical_volume_ml <= 0:
             raise ValueError('Clinical reference volume must be finite and positive')
@@ -321,11 +386,13 @@ def measure_masks(prediction_path, reference_path, clinical_volume_ml=None, fore
     ref_ml = ref_n * abs(np.linalg.det(ref_img.affine[:3, :3])) / 1000
     error_ml = pred_ml - ref_ml
     return dict(
-        dsc=2 * int((pred & ref).sum()) / (pred_n + ref_n),
+        dsc=2 * int((pred & ref).sum()) / (overlap_pred_n + ref_n),
         predicted_volume_ml=pred_ml, reference_volume_ml=ref_ml,
         volume_error_ml=error_ml, squared_volume_error_ml2=error_ml ** 2,
         predicted_voxels=pred_n, reference_voxels=ref_n,
-        max_corner_displacement_mm=float(displacement),
+        max_corner_displacement_mm=float(field_displacement if align_geometry else displacement),
+        geometry_alignment=('canonical_resample_nearest' if needs_resampling else 'canonical_reorientation')
+        if align_geometry else 'native_grid',
     )
 
 # %% [markdown]
@@ -363,7 +430,8 @@ def evaluate_cohorts(cohorts, failures=None):
         if any(not isinstance(case_id, str) or Path(case_id).name != case_id
                or case_id in ('', '.', '..') for case_id in ids):
             errors.append('Invalid case IDs')
-        expected_names = {f"{row['id']}.nii.gz" for row in cohort['rows']}
+        expected_names = {Path(row['prediction_path']).name if 'prediction_path' in row
+                          else f"{row['id']}.nii.gz" for row in cohort['rows']}
         actual_names = set() if scalar else {p.name for p in out.glob('*.nii*') if p.is_file()}
         unexpected = sorted(actual_names - expected_names)
         clinical = cohort.get('reference_type') == 'clinical_volume'
@@ -387,6 +455,8 @@ def evaluate_cohorts(cohorts, failures=None):
                 record.update(status='invalid_cohort', error='; '.join(errors))
             elif not image.is_file() or (ref is not None and not ref.is_file()):
                 record.update(status='invalid_input', error='Missing image or reference')
+            elif row.get('source_error'):
+                record.update(status='invalid_input', error=row['source_error'])
             elif scalar:
                 try:
                     if row.get('source_error'):
@@ -399,10 +469,8 @@ def evaluate_cohorts(cohorts, failures=None):
                     record.update(status='invalid_volume', error=f'{type(exc).__name__}: {exc}')
             elif pred.is_file():
                 try:
-                    measurement_options = (
-                        dict(foreground_labels=cohort['foreground_labels'])
-                        if 'foreground_labels' in cohort else {}
-                    )
+                    measurement_options = {key: cohort[key] for key in ('foreground_labels', 'align_geometry')
+                                           if key in cohort}
                     record.update(measure_masks(pred, image, row['reference_volume_ml'], **measurement_options)
                                   if clinical else measure_masks(pred, ref, **measurement_options))
                     record['status'] = 'evaluated'
@@ -433,7 +501,7 @@ def evaluate_cohorts(cohorts, failures=None):
 
     metric_columns = ['dsc', 'predicted_volume_ml', 'reference_volume_ml', 'volume_error_ml',
                       'squared_volume_error_ml2', 'predicted_voxels', 'reference_voxels',
-                      'max_corner_displacement_mm']
+                      'max_corner_displacement_mm', 'geometry_alignment']
     per_case = pd.DataFrame(case_records).reindex(columns=[
         'model', 'dataset', 'split', 'cohort', 'reference_type', 'region', 'case_id', 'image_path', 'reference_path', 'prediction_path',
         'prediction_type', 'source_file', 'source_column', 'mapped_exam', 'mapped_patient_id', 'mapped_study_id',
@@ -594,12 +662,13 @@ for row in cohort_audit.itertuples(index=False):
 geometry_mismatches = per_case.loc[
     per_case.status.eq('evaluated')
     & per_case.max_corner_displacement_mm.gt(GEOMETRY_WARNING_THRESHOLD_MM),
-    ['model', 'cohort', 'case_id', 'max_corner_displacement_mm'],
+    ['model', 'cohort', 'case_id', 'max_corner_displacement_mm', 'geometry_alignment'],
 ]
 if not geometry_mismatches.empty:
-    print('WARNING: Evaluated cases with prediction/reference geometry displacement '
+    print('WARNING: Evaluated cases with prediction/reference grid displacement '
           f'> {GEOMETRY_WARNING_THRESHOLD_MM:g} mm '
-          f'(accepted tolerance: {GEOMETRY_TOLERANCE_MM:g} mm):')
+          f'(direct-grid tolerance: {GEOMETRY_TOLERANCE_MM:g} mm; '
+          'explicitly aligned cohorts may exceed this before resampling):')
     print(geometry_mismatches.to_string(
         index=False, formatters={'max_corner_displacement_mm': lambda value: f'{value:.6g}'},
     ))
@@ -636,6 +705,10 @@ table_index = pd.MultiIndex.from_tuples(
 model_names = pd.Index(list(dict.fromkeys(
     [m['name'] for m in MODELS] + [c['model'] for c in COHORTS]
 )), name='Model')
+if 'Bosma22b' in model_names and 'Clinical manual ellipsoid' in model_names:
+    ordered = [name for name in model_names if name != 'Bosma22b']
+    ordered.insert(ordered.index('Clinical manual ellipsoid'), 'Bosma22b')
+    model_names = pd.Index(ordered, name='Model')
 dsc_table = pd.DataFrame(index=table_index, columns=model_names, dtype=float)
 mae_table = dsc_table.copy()
 rmse_table = dsc_table.copy()

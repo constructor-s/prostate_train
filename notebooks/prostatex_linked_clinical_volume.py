@@ -14,7 +14,10 @@
 # Start from the 328 examinations in `ProstateX-mapping.json`, representing 327
 # unique subjects. The local mask index and PI-CAI public clinical marksheet
 # supply the manual whole-gland masks and clinical measurements for this analysis.
-# Expected counts are recomputed from local metadata immediately below:
+# Membership comes from the reviewed testing fold in
+# configs/rumcnotprostatexnoclinical_folds.json; metadata validates its cases.
+# ProstateX-0031 is excluded for insufficient source-image prostate coverage.
+# Expected counts are recomputed below:
 #
 # | Stage | Examinations | Explanation |
 # |---|---:|---|
@@ -22,15 +25,16 @@
 # | Local manual whole-gland mask available | 194 | 134 examinations lack a local mask |
 # | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
 # | Matched clinical marksheet | 192 | All remaining examinations match |
-# | Valid clinical volume: volume analysis | **190** | Two lack usable clinical volume |
-# | PSA available: subsequent density analysis | **189** | ProstateX-0202 lacks PSA |
+# | Valid clinical volume before testing-fold selection | 190 | Two lack usable clinical volume |
+# | Reviewed testing fold: volume analysis | **189** | Exclude ProstateX-0031 for insufficient image coverage |
+# | PSA available: subsequent density analysis | **188** | ProstateX-0202 lacks PSA |
 #
-# Keep all 190 volume cases, including suspicious records, for volume analysis.
+# Keep all 189 selected volume cases, including suspicious records, for volume analysis.
 # Only at the density step remove missing/nonfinite PSA. Eight cases with PSA
 # but missing reported PSAD remain in recalculated density comparisons. The
-# separate reported-PSAD diagnostic uses its 181 complete valid clinical triples.
+# separate reported-PSAD diagnostic uses its 180 complete valid clinical triples.
 # Flag |reported PSAD − PSA / clinical volume| > **0.01 ng/mL²** for review only
-# (23 current cases). This diagnostic threshold is not documented source precision
+# (22 current cases). This diagnostic threshold is not documented source precision
 # and a flag does not identify which clinical field, if any, is wrong.
 
 # %%
@@ -73,11 +77,12 @@ INDEX_PATH = MASK_ROOT / 'index.csv'
 MAPPING_PATH = PICAI_ROOT / 'additional_resources/ProstateX-mapping.json'
 MARKSHEET_PATH = PICAI_ROOT / 'clinical_information/marksheet.csv'
 OUTPUT_DIR = REPO_ROOT / 'results/prostatex_linked_volume'
-EXPECTED_CASES = 190
+TESTING_MANIFEST_PATH = REPO_ROOT / 'configs/rumcnotprostatexnoclinical_folds.json'
+DATA_ROOT = REPO_ROOT / 'data/raw'
 PSAD_REPORTING_TOLERANCE = 0.01  # ng/mL²; diagnostic review threshold only
 QC_NUMERICAL_TOLERANCE = 1e-12
 
-for path in (INDEX_PATH, MAPPING_PATH, MARKSHEET_PATH):
+for path in (INDEX_PATH, MAPPING_PATH, MARKSHEET_PATH, TESTING_MANIFEST_PATH):
     if not path.is_file():
         raise FileNotFoundError(f'Required local input: {path}')
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -92,6 +97,14 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # %%
 cases = pd.read_csv(INDEX_PATH)
+# The manually reviewed testing fold is authoritative; metadata validates it.
+manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
+testing_rows = manifest['testing']
+testing_ids = [row['id'] for row in testing_rows]
+assert testing_ids and len(testing_ids) == len(set(testing_ids)), 'Empty testing fold or duplicate testing IDs'
+assert not set(testing_ids) & {row['id'] for row in manifest.get('excluded', [])}, 'Testing/excluded overlap'
+assert set(testing_ids) <= set(cases['ID']), 'Testing IDs missing from local mask index'
+EXPECTED_CASES = len(testing_ids)
 marksheet = pd.read_csv(MARKSHEET_PATH)
 assert cases['ID'].is_unique, 'Duplicate PROSTATEx IDs in mask index'
 assert not marksheet[['patient_id', 'study_id']].isna().any().any()
@@ -112,15 +125,25 @@ cohort = cohort.merge(
 )
 clinical = pd.to_numeric(cohort['prostate_volume'], errors='coerce')
 cohort['clinical_volume_ml'] = clinical
-cohort['selection_status'] = np.select(
+cohort['linkage_status'] = np.select(
     [cohort['ID'].isin(ambiguous_ids), cohort['picai_key'].isna(),
      cohort['marksheet_match'].ne('both'), ~np.isfinite(clinical) | clinical.le(0)],
     ['ambiguous_mapping', 'no_mapping', 'no_marksheet', 'invalid_clinical_volume'],
     default='included',
 )
+cohort['in_testing_fold'] = cohort['ID'].isin(testing_ids)
+cohort['selection_status'] = np.where(cohort['in_testing_fold'], cohort['linkage_status'], 'not_in_testing_fold')
+cohort['exclusion_reason'] = np.where(cohort['in_testing_fold'], '', 'not_in_testing_fold')
+# This explains a documented exclusion; it does not independently select cases.
+quality_excluded = ~cohort['in_testing_fold'] & cohort['ID'].eq('ProstateX-0031')
+cohort.loc[quality_excluded, 'exclusion_reason'] = 'insufficient_source_image_prostate_coverage'
 cohort.to_csv(OUTPUT_DIR / 'cohort_linkage_audit.csv', index=False)
-linked = cohort.loc[cohort['selection_status'].eq('included')].copy().reset_index(drop=True)
-assert len(linked) == EXPECTED_CASES, 'Cohort changed; inspect linkage audit before analysis'
+linked = cohort.set_index('ID', drop=False).loc[testing_ids].copy().reset_index(drop=True)
+assert linked['linkage_status'].eq('included').all(), 'Invalid testing-case linkage or clinical volume; inspect linkage audit'
+for entry, row in zip(testing_rows, linked.itertuples(index=False)):
+    assert (DATA_ROOT / entry['image']).resolve() == (MASK_ROOT / row.t2).resolve(), f'{row.ID}: testing image path mismatch'
+    assert (DATA_ROOT / entry['label']).resolve() == (MASK_ROOT / row.label_wg).resolve(), f'{row.ID}: testing manual-mask path mismatch'
+assert len(linked) == EXPECTED_CASES, 'Testing cohort changed'
 assert not linked.duplicated(['patient_id', 'study_id']).any(), 'Repeated linked study'
 
 # %% [markdown]
@@ -143,7 +166,10 @@ for stage, frame, reason in [
     ('Local manual whole-gland mask available', mapped_masks, 'No local manual whole-gland mask'),
     ('Unambiguous linkage', unambiguous_masks, 'Ambiguous PROSTATEx mapping'),
     ('Matched clinical marksheet', matched_marksheet, 'No matching clinical marksheet'),
-    ('Valid clinical volume: volume analysis', linked, 'Missing/nonfinite/nonpositive clinical volume'),
+    ('Valid clinical volume before testing-fold selection', cohort.loc[cohort.linkage_status.eq('included')],
+     'Missing/nonfinite/nonpositive clinical volume'),
+    ('Reviewed testing fold: volume analysis', linked,
+     'Not in reviewed testing fold; ProstateX-0031 has insufficient source-image prostate coverage'),
     ('PSA available: subsequent density analysis', linked.loc[psa_available], 'Missing/nonfinite PSA'),
 ]:
     n_examinations = len(frame)
@@ -263,7 +289,7 @@ volumes = linked.merge(pd.DataFrame(reference_rows), on='ID', validate='one_to_o
 # standardized study's `prostatex_original_train_mapped` folders. Their saved
 # `inference_config.json` files document a five-fold ensemble (folds 0–4),
 # tile step 0.8, and disabled mirroring. Predictions are matched by PROSTATEx ID
-# and use whole-gland label 1. Each folder contains 193 masks; only the 190
+# and use whole-gland label 1. Each folder contains 193 masks; only the selected 189
 # eligible linked cases enter this analysis. Legacy Dataset609 remains optional
 # and uses its original prediction folder and historical inference settings.
 # PI-CAI masks are matched by patient/study ID.
@@ -855,7 +881,7 @@ pairwise_statistics.to_csv(OUTPUT_DIR / 'comparator_pairwise_statistics.csv', in
 # A separate analysis at the end examines that reported value.
 #
 # Retain all volume-analysis cases in this audit, then remove missing/nonfinite
-# PSA only (currently ProstateX-0202), giving 189 density cases. Reported PSAD and
+# PSA only (currently ProstateX-0202), giving 188 density cases. Reported PSAD and
 # review flags do not affect eligibility. Finite PSA must be positive and reference
 # and selected-method volumes must be finite positive; unexpected invalid values
 # stop execution rather than silently shrink the cohort. These requirements allow

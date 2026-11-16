@@ -11,7 +11,8 @@
 # masks. Training labels remain Bosma22b AI surrogate annotations. Exclude every
 # PROSTATEx-mapped patient from training, including ambiguous links and repeats.
 # Testing requires one mapped exam and a finite positive clinical ellipsoid
-# volume (mL): 190 of 193 mapped cases qualify. Record all exclusions in the audit.
+# volume (mL) and adequate source-image prostate coverage: 189 of 193 mapped
+# cases qualify. Record all exclusions in the audit.
 #
 # Run cells in order, or execute this file with the project Python environment.
 # Write the manifest under configs/ and selection audits under
@@ -178,6 +179,13 @@ assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_pat
 # Retain all links for ambiguous IDs when checking overlap, since
 # choosing one link could miss a shared training patient. Original PROSTATEx T2
 # images are paired with mask_prostate annotations, never PI-CAI AI labels.
+# Visual quality review excludes ProstateX-0031 (PI-CAI 10804_1000820): the
+# source image crop provides insufficient prostate coverage. The segmentation
+# touches the superior boundary, and approximately 12.42% (5.412 mL) of manual
+# reference volume lies outside the PI-CAI grid. Apply this case-level source
+# quality exclusion to every testing comparator, not only Bosma22b.
+# Review the generated candidate before manually copying it to the active
+# configs/rumcnotprostatexnoclinical_folds.json; this notebook does not update it.
 
 # %%
 testing = prostatex.sort_values('ID').copy()
@@ -212,13 +220,15 @@ testing['clinical_volume_ml'] = pd.to_numeric(testing['prostate_volume'], errors
 testing['has_valid_clinical_volume'] = (
     np.isfinite(testing['clinical_volume_ml']) & testing['clinical_volume_ml'].gt(0)
 )
+testing['has_source_image_quality_issue'] = testing['ID'].eq('ProstateX-0031')
 testing['testing_eligible'] = (
     testing['mapping_count'].eq(1) & testing['has_marksheet_exam'] & testing['has_valid_clinical_volume']
+    & ~testing['has_source_image_quality_issue']
 )
 testing['exclusion_reason'] = np.select(
-    [testing['mapping_count'].eq(0), testing['mapping_count'].gt(1),
-     ~testing['has_marksheet_exam'], ~testing['has_valid_clinical_volume']],
-    ['no_mapping', 'ambiguous_mapping', 'missing_marksheet_exam',
+    [testing['has_source_image_quality_issue'], testing['mapping_count'].eq(0),
+     testing['mapping_count'].gt(1), ~testing['has_marksheet_exam'], ~testing['has_valid_clinical_volume']],
+    ['insufficient_source_image_prostate_coverage', 'no_mapping', 'ambiguous_mapping', 'missing_marksheet_exam',
      'missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume'],
     default='',
 )
@@ -241,7 +251,8 @@ display(testing_audit.loc[testing_audit['assignment'].eq('excluded'),
 # Of 204 locally indexed PROSTATEx cases, 11 have no mapping. Among the 193
 # mapped identities, ProstateX-0025 has two mapped exams and is excluded rather
 # than choosing a volume arbitrarily (99.5 versus 95 mL). Of the remaining 192,
-# ProstateX-0071 and ProstateX-0149 have missing volumes, leaving 190 testing cases.
+# ProstateX-0071 and ProstateX-0149 have missing volumes, leaving 190 cases.
+# Exclude ProstateX-0031 for insufficient source-image coverage, leaving 189 testing cases.
 
 # %%
 no_complete = audit.loc[~audit['patient_has_complete_exam']]
@@ -270,6 +281,8 @@ testing_flow = pd.DataFrame([
          testing_audit.loc[testing_audit.exclusion_reason.eq('missing_marksheet_exam')]),
         ('PROSTATEx: invalid clinical volume (excluded)', testing_audit.loc[
             testing_audit.exclusion_reason.eq('missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume')]),
+        ('PROSTATEx: insufficient source-image prostate coverage (excluded)', testing_audit.loc[
+            testing_audit.exclusion_reason.eq('insufficient_source_image_prostate_coverage')]),
         ('Testing: clinical volume and original images/manual whole-gland masks', testing),
     ]
 ])
@@ -281,7 +294,8 @@ assert (len(eligible), len(training)) == (239, 236), 'RUMC training counts chang
 assert len(testing_audit) == 204, 'Local PROSTATEx index changed'
 assert testing_audit.mapping_count.gt(0).sum() == 193, 'Mapped PROSTATEx cohort changed'
 assert testing_audit.mapping_count.eq(1).sum() == 192, 'Unambiguous PROSTATEx cohort changed'
-assert len(testing) == 190, 'Volume-eligible PROSTATEx testing count changed'
+assert len(testing) == 189, 'Quality- and volume-eligible PROSTATEx testing count changed'
+assert not testing['has_source_image_quality_issue'].any(), 'Source-image quality exclusion failed'
 display(flow)
 display(audit.groupby('selection_reason').agg(examinations=('ID', 'size'), patients=('patient_id', 'nunique')))
 

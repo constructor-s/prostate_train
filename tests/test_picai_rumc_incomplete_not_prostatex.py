@@ -98,20 +98,47 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
         self.assertEqual(result['training'].study_id.tolist(), [900])
         self.assertEqual(result['audit'].assignment.tolist(), ['excluded', 'training', 'excluded'])
 
+    def test_source_quality_exclusion_retains_mapping_and_training_selection(self):
+        namespace = self.select(
+            [dict(patient_id=10804, study_id=1000820, psad=np.nan),
+             dict(patient_id=2, study_id=200, psad=np.nan)],
+            mapping={'ProstateX-0031_date': '10804_1000820',
+                     'ProstateX-0001_date': '3_300'})
+        training_before = namespace['training'].copy(deep=True)
+        namespace.update(
+            prostatex=pd.DataFrame({'ID': ['ProstateX-0031', 'ProstateX-0001']}),
+            marksheet=pd.DataFrame({'patient_id': [10804, 3],
+                                    'study_id': [1000820, 300], 'prostate_volume': [50., 60.]}))
+        exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
+        self.assertEqual(namespace['testing'].ID.tolist(), ['ProstateX-0001'])
+        row = namespace['testing_audit'].set_index('ID').loc['ProstateX-0031']
+        self.assertEqual(row.assignment, 'excluded')
+        self.assertEqual(row.exclusion_reason, 'insufficient_source_image_prostate_coverage')
+        self.assertEqual(row.picai_key, '10804_1000820')
+        self.assertTrue(row.has_valid_clinical_volume)
+        self.assertTrue(row.has_source_image_quality_issue)
+        pd.testing.assert_frame_equal(namespace['training'], training_before)
+        self.assertEqual(namespace['training'].patient_id.tolist(), [2])
+
     def test_testing_excludes_unmapped_cases_and_checks_all_ambiguous_links(self):
         namespace = dict(
-            prostatex=pd.DataFrame({'ID': ['ProstateX-0002', 'ProstateX-0001']}),
-            mapping={'ProstateX-0001_a': '1_100', 'ProstateX-0001_b': '2_200'},
+            prostatex=pd.DataFrame({'ID': ['ProstateX-0002', 'ProstateX-0001', 'ProstateX-0003']}),
+            marksheet=pd.DataFrame({'patient_id': [1, 2, 4], 'study_id': [100, 200, 400],
+                                    'prostate_volume': [50., 60., 70.]}),
+            mapping={'ProstateX-0001_a': '1_100', 'ProstateX-0001_b': '2_200',
+                     'ProstateX-0003_a': '4_400'},
             training=pd.DataFrame({'patient_id': [3], 'ID': ['3_300']}),
             np=np, pd=pd, display=lambda *args: None,
         )
         exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
         testing = namespace['testing']
-        self.assertEqual(testing.ID.tolist(), ['ProstateX-0001'])
-        self.assertEqual(testing.mapping_count.tolist(), [2])
-        self.assertEqual(testing.picai_keys.tolist(), ['1_100,2_200'])
+        self.assertEqual(testing.ID.tolist(), ['ProstateX-0003'])
+        self.assertEqual(testing.mapping_count.tolist(), [1])
+        self.assertEqual(testing.picai_keys.tolist(), ['4_400'])
         audit = namespace['testing_audit']
-        self.assertEqual(audit.assignment.tolist(), ['testing', 'excluded'])
+        self.assertEqual(audit.assignment.tolist(), ['excluded', 'excluded', 'testing'])
+        self.assertEqual(audit.picai_keys.iloc[0], '1_100,2_200')
+        self.assertEqual(audit.exclusion_reason.iloc[0], 'ambiguous_mapping')
         self.assertEqual(audit.linkage_status.iloc[1], 'excluded_no_mapping')
         # A different examination of either ambiguous mapped patient must fail.
         namespace['training'] = pd.DataFrame({'patient_id': [2], 'ID': ['2_999']})

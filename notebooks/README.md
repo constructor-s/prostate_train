@@ -3,6 +3,30 @@
 Run the Python cell notebooks from this directory (`notebooks/`); the repository
 root is assumed to be its parent.
 
+## Toronto JDMI manual ellipsoid failure analysis
+
+[toronto_jdmi_manual_ellipsoid_failure.py](toronto_jdmi_manual_ellipsoid_failure.py)
+is a focused follow-on to `toronto_jdmi_clinical_volume.py`. Run that notebook
+first; this analysis reads its `report_volume_quality_audit.csv`,
+`comparator_volumes.csv`, and `clinical_fields_audit.csv` outputs. It uses the
+existing Below range, Above range, and Missing coefficient classifications to
+compare flagged and within-range cases against median manual-reader planimetry
+and the saved Multicenter and RUMC volumes. It also summarizes flagged-case
+PSAD stratum changes and PI-RADS 3 crossings of 0.15 ng/mL². These flags are
+review categories, not adjudicated errors, and the saved segmentation volumes
+are comparators rather than independent truth.
+
+Run cells in order, or after the source notebook from the repository root:
+
+```bash
+MPLBACKEND=Agg .venv/bin/python notebooks/toronto_jdmi_manual_ellipsoid_failure.py
+```
+
+Outputs are written to the Git-ignored
+`results/toronto_jdmi_manual_ellipsoid_failure/`. Identifiers are retained only
+in local case-level audit and review CSVs; displayed results contain aggregate
+tables and an identifier-free flagged-case table.
+
 ## Toronto JDMI volume agreement
 
 [toronto_jdmi_clinical_volume.py](toronto_jdmi_clinical_volume.py) compares clinical
@@ -39,6 +63,40 @@ and `aano` identifies the examination/accession. Workbook linkage uses trimmed
 manual-reader measurements reconstruct the listing reference (CH zero is missing).
 Report dimensions in cm provide a separate π/6 ellipsoid diagnostic in mL.
 
+The final analysis section, immediately before the reproducibility record,
+checks clinical report quality by comparing that ellipsoid with `vol_report_ref`
+using an inclusive range from `0.5 × (d1−0.1) × (d2−0.1) × (d3−0.1)` to
+`π/6 × (d1+0.1) × (d2+0.1) × (d3+0.1)`, with dimensions in cm and volumes in mL.
+This permits ±0.1 cm dimension uncertainty and coefficient choice; no extra
+reported-volume rounding is allowed. An assertion requires every selected case
+to have positive finite uncensored dimensions and valid calculated volumes.
+The Bland–Altman plot distinguishes volumes below/above the
+range by color and marker, retaining all selected cases in the tabulated bias
+and descriptive limits of agreement. The plot shows only the zero-difference
+line. It displays a log x-axis from 10–300 mL and
+differences from −40 to +40 mL, annotating the number and percentage of selected
+points outside the view. Clipped points remain in the statistics and audit.
+Flags warrant review and do not exclude cases.
+Outputs are `report_volume_quality_audit.csv` and
+`report_volume_quality.png`/`.pdf` in the same local results directory.
+After the plots, `report_volume_quality_table` displays every Below range,
+Above range, and Missing coefficient case in cohort order, without identifiers,
+and exports the same columns to `report_volume_quality_table.csv` without an index.
+Columns are parsed `dim1`, `dim2`, `dim3` (cm), `recalculated_volume_ml`,
+`recalculated_psad`, `report_volume_ml`, `report_psad`,
+`manual_planimetry_volume_ml`, `manual_planimetry_psad`, `PIRADS`, and `CSCANCER`.
+Recalculated volume uses π/6 × dim1 × dim2 × dim3; manual planimetry is the median
+manual-reader reference. Each PSAD uses the same consolidated PSA divided by its
+corresponding volume, in ng/mL². Missing PI-RADS and unknown outcomes remain in
+the table. Display dimensions and volumes to two decimals and PSAD to three;
+the dataframe and CSV retain full calculation precision. No flags yields an empty
+table and a header-only CSV.
+Immediately after the table, a printed summary compares reported with recalculated
+PSAD among these flagged cases: changes across the four categories [0, 0.10),
+[0.10, 0.15), [0.15, 0.20), and ≥0.20, plus PI-RADS 3 cases crossing 0.15 ng/mL².
+Counts include both directions and their denominators. Comparisons use unrounded
+PSAD, with equality at 0.15 on the ≥ side; missing PI-RADS is outside the PI-RADS 3 count.
+
 PSA parsing follows the Haider analysis (decimal commas and `>` removal, with
 censoring flagged). Preserve raw fields and apply its documented single-record
 alternative-PSA correction to an analytical copy. Use positive finite
@@ -60,7 +118,8 @@ parameters, package versions, and the notebook checksum. It also pins cohort
 membership for subsequent runs; review and archive the prior output directory
 before intentionally establishing a changed cohort. Patient-level audits and
 metadata are private and must remain local; displayed tables and plots contain
-aggregate results without patient identifiers. Historical inference settings
+aggregates plus the final individual-case review table, without patient identifiers.
+Historical inference settings
 are recorded only where saved metadata is available.
 
 Additional local outputs are `workbook_key_audit.csv`, `clinical_fields_audit.csv`,
@@ -97,6 +156,67 @@ Biopsy outputs use `psa_density_biopsy_` followed by `audit.csv`, `per_case.csv`
 `summary.csv`, and `confusion.csv`/`.png`/`.pdf`. Single-method runs refresh empty
 pairwise outputs. Run metadata records density cutoffs, statistical families,
 biopsy definitions and counts. Reported-marksheet-PSAD diagnostics are omitted.
+
+## Toronto JDMI full cohort: 4,111 patients
+
+[toronto_jdmi_4111_clinical_volume.py](toronto_jdmi_4111_clinical_volume.py)
+replicates the volume, PSA-density, paired-inference, PI-RADS 3 biopsy simulation,
+and report-quality analyses above using the **nnUNet702 automated surrogate
+reference**. It measures agreement with saved automated masks rather than
+accuracy against independent manual annotations. The existing 383-patient
+manual-reference notebook remains a separate study.
+
+Start from all **4,116 patients** in the same full clinical CSV and apply every
+accession exclusion in `exclude.json`, leaving **4,111 patients**. Preserve the
+upstream one-examination-per-patient selection and listing order; do not require
+manual-reader volumes or substitute another visit. Available manual values are
+checked against the workbook for provenance and never supply the analysis
+reference.
+
+In addition to the original notebook's workbook, T2 images, comparator predictions,
+and comparator metadata, require one mask per eligible patient at
+`data_internal/hlab20260928/PROSATEPSAD/{ID}/wp-pz-tz_axt2_nnunet-702.nii.gz`.
+Validate finite integer labels drawn from **0, 1, 2, 3**. Whole gland is the
+**union of labels 1, 2, 3**: count foreground voxels, multiply by the absolute
+determinant of the spatial affine in mm³, and divide by 1,000 for mL. Record
+observed labels and each label's voxel count. A mask may lack an individual zone
+label but its whole-gland volume must be positive. The binary
+`wp_axt2_nnunet-274.nii.gz` is not this study's reference.
+
+Run cells in order, or from the repository root:
+
+```bash
+MPLBACKEND=Agg .venv/bin/python notebooks/toronto_jdmi_4111_clinical_volume.py
+```
+
+Supply the encrypted workbook password at runtime; it is not saved. No downloads,
+training, or inference occur. Masks are measured on native grids with matching
+shapes, valid affines, and ≤0.5 mm corner displacement. Explicit non-mm units
+fail. The full inputs include 1,554 reference masks and 183 T2 images whose
+spatial-unit code is unknown. Accept an unknown code only when its grid matches
+a known-mm anchor within **0.01 mm** at corresponding voxel corners: use the T2
+when marked mm, otherwise a selected comparator mask matching the T2 grid.
+Record original units, the assumption, anchor path, and displacement in the
+measurement audit, plus assumption counts and the rule in run metadata. The
+0.01 mm tolerance allows observed coordinate differences up to 0.003 mm while
+remaining stricter than the general 0.5 mm geometry tolerance. Inputs
+are not modified. A missing anchor or looser match stops measurement.
+Missing or invalid reference/comparator measurements stop after a local audit.
+Zero comparator predictions stay in volume statistics and stop the PSAD section
+after its audit. Other clinical validation, thresholds, statistical families,
+100,000 bootstrap resamples, and seed `20261102` match the original analysis.
+
+Outputs use the original study's filenames in the separate Git-ignored directory
+`results/toronto_jdmi_4111_clinical_volume/`. `gt_volume_ml` and `gt_psad` refer to
+the nnUNet702 surrogate; raw `ground_truth_volume_ml` and
+`listing_manual_reference_ml` retain the optional manual CSV values. The
+identifier-free report-quality table uses `reference_volume_ml` and
+`reference_psad`. The reproducibility record hashes the reference masks,
+predictions, T2 images, clinical inputs, and notebook; records label rules,
+parameters, package versions, and available comparator metadata; and pins cohort
+membership and the expected count. Review audits and archive previous outputs
+before intentionally changing the cohort. Historical reference training and
+inference settings are unknown. Patient-level outputs remain private and local.
 
 ## PI-CAI clinical volume and PSA density
 

@@ -38,6 +38,38 @@ from IPython.display import display
 from matplotlib.ticker import FuncFormatter, NullFormatter
 from tqdm.auto import tqdm
 
+
+def report_outside_axis_points(figure_name, panels):
+    """Print plotted rows outside their panel limits, retaining case IDs."""
+    outside_points = []
+    for panel_name, case_ids, x_values, y_values, x_limits, y_limits in panels:
+        points = pd.DataFrame({
+            'case_id': np.asarray(case_ids),
+            'x': np.asarray(x_values, dtype=float),
+            'y': np.asarray(y_values, dtype=float),
+        })
+        outside_x = (points.x < x_limits[0]) | (points.x > x_limits[1])
+        outside_y = (points.y < y_limits[0]) | (points.y > y_limits[1])
+        outside = outside_x | outside_y
+        if outside.any():
+            points = points.loc[outside].copy()
+            points.insert(0, 'panel', panel_name)
+            points['outside_axes'] = np.select(
+                [outside_x.loc[outside] & outside_y.loc[outside], outside_x.loc[outside],
+                 outside_y.loc[outside]],
+                ['x,y', 'x', 'y'],
+            )
+            outside_points.append(points)
+
+    if outside_points:
+        result = pd.concat(outside_points, ignore_index=True)
+        print(f'Points outside axis limits — {figure_name}:')
+        print(result.to_string(index=False))
+    else:
+        result = pd.DataFrame(columns=['panel', 'case_id', 'x', 'y', 'outside_axes'])
+        print(f'No points outside axis limits — {figure_name}.')
+    return result
+
 REPO_ROOT = Path(__file__).resolve().parents[1] if '__file__' in globals() else Path.cwd().resolve()
 if REPO_ROOT.name == 'notebooks':
     REPO_ROOT = REPO_ROOT.parent
@@ -541,6 +573,23 @@ for ax in axes.flat:
         ax.tick_params(axis='both', labelsize=8, pad=1.5, labelbottom=True, labelleft=True)
         ax.legend(**legend_options)
 
+volume_scatter_panels = []
+volume_row_names = ['volume', 'difference (mL)', 'relative difference (%)']
+for row, y_tables in enumerate([
+    measured_volumes,
+    differences_ml,
+    differences_percent,
+]):
+    for column, key in enumerate(SELECTED_COMPARATORS):
+        panel_ax = axes[row, column]
+        volume_scatter_panels.append((
+            f'{COMPARATORS[key][0]} — {volume_row_names[row]}', volumes.ID,
+            gt, y_tables[key], panel_ax.get_xlim(), panel_ax.get_ylim(),
+        ))
+volume_outside_axis_points = report_outside_axis_points(
+    'volume agreement', volume_scatter_panels,
+)
+
 fig.savefig(OUTPUT_DIR / 'comparator_agreement.png', dpi=300)
 fig.savefig(OUTPUT_DIR / 'comparator_agreement.pdf')
 plt.show()
@@ -995,6 +1044,22 @@ for ax in axes.flat:
     if ax.axison:
         ax.tick_params(axis='both', labelsize=7, pad=1.5, labelbottom=True, labelleft=True)
         ax.legend(**legend_options)
+psad_scatter_panels = []
+psad_row_names = ['PSA density', 'difference', 'relative difference (%)']
+for row, y_tables in enumerate([
+    psad_values,
+    psad_differences,
+    psad_relative_differences,
+]):
+    for column, key in enumerate(SELECTED_COMPARATORS):
+        panel_ax = axes[row, column]
+        psad_scatter_panels.append((
+            f'{COMPARATORS[key][0]} — {psad_row_names[row]}', psad_cases.ID,
+            psad_gt, y_tables[key], panel_ax.get_xlim(), panel_ax.get_ylim(),
+        ))
+psad_outside_axis_points = report_outside_axis_points(
+    'PSA density agreement', psad_scatter_panels,
+)
 fig.savefig(OUTPUT_DIR / 'psa_density_agreement.png', dpi=300)
 fig.savefig(OUTPUT_DIR / 'psa_density_agreement.pdf')
 plt.show()
@@ -1810,6 +1875,18 @@ quality_agreement_ax.set_xlabel('Manual planimetry volume\n(mL; log scale)', fon
 quality_agreement_ax.set_ylabel('Reported volume − manual\nplanimetry (mL)', fontsize=8)
 quality_agreement_ax.set_title('Agreement with manual planimetry', fontsize=9)
 quality_agreement_ax.legend(handles=quality_agreement_ax.lines[:2], loc='best', fontsize=7)
+quality_outside_axis_points = report_outside_axis_points('report volume quality', [
+    (
+        'Consistency with report dimensions', report_volume_quality.ID,
+        report_volume_quality.mean_volume_ml, report_volume_quality.difference_ml,
+        ax.get_xlim(), ax.get_ylim(),
+    ),
+    (
+        'Agreement with manual planimetry', report_volume_quality.ID,
+        quality_reference_ml, quality_reference_difference_ml,
+        quality_agreement_ax.get_xlim(), quality_agreement_ax.get_ylim(),
+    ),
+])
 for panel in axes:
     panel.tick_params(axis='both', labelsize=8)
 # Reserve space for one shared group legend below both panels. Keeping long

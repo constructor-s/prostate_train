@@ -28,6 +28,7 @@ SELECTION = SOURCE[SOURCE.index('listing = pd.read_csv('):SOURCE.index('# %% [ma
 LOADING = SOURCE[SOURCE.index("with WORKBOOK.open('rb')"):SOURCE.index('# %% [markdown]\n# ## Link clinical fields')]
 LINKAGE = SOURCE[SOURCE.index('READER_FIELDS = ['):SOURCE.index('# %% [markdown]\n# ## Direct measurements')]
 REPORT_QUALITY = SOURCE[SOURCE.index('# %% [markdown]\n# ## Clinical report volume quality check'):SOURCE.index('# %% [markdown]\n# ## Local reproducibility record')]
+PLOT_DIAGNOSTICS = SOURCE[SOURCE.index('def report_outside_axis_points'):SOURCE.index('\nREPO_ROOT =')]
 MEASUREMENT = SOURCE[SOURCE.index('input_hashes = {}'):SOURCE.index('# %% [markdown]\n# ## Volume accuracy')]
 SUMMARY = SOURCE[SOURCE.index('gt = volumes['):SOURCE.index('# %% [markdown]\n# ## Agreement plots')]
 STATISTICS = SOURCE[SOURCE.index('# %% [markdown]\n# ## Paired post hoc inference:'):SOURCE.index('# %% [markdown]\n# ## PSA density inputs')]
@@ -241,8 +242,36 @@ class TorontoReportVolumeQualityTests(unittest.TestCase):
     def execute(self, ns, source=REPORT_QUALITY):
         with patch.object(plt, 'show'), warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always', UserWarning)
+            exec(compile(PLOT_DIAGNOSTICS, str(NOTEBOOK), 'exec'), ns)
             exec(compile(source, str(NOTEBOOK), 'exec'), ns)
         self.assertFalse(any('constrained_layout not applied' in str(item.message) for item in caught))
+
+    def test_plot_diagnostics_print_each_outside_point_once(self):
+        ns = dict(np=np, pd=pd)
+        exec(compile(PLOT_DIAGNOSTICS, str(NOTEBOOK), 'exec'), ns)
+        panels = [(
+            'synthetic panel',
+            ['x-only', 'y-only', 'both', 'inside'],
+            [0., 5., 11., 5.],
+            [5., -1., 11., 5.],
+            (0., 10.), (0., 10.),
+        )]
+        output = StringIO()
+        with redirect_stdout(output):
+            outside = ns['report_outside_axis_points']('synthetic figure', panels)
+        self.assertEqual(outside.case_id.tolist(), ['x-only', 'y-only', 'both'])
+        self.assertEqual(outside.outside_axes.tolist(), ['x', 'y', 'x,y'])
+        self.assertEqual(outside.panel.tolist(), ['synthetic panel'] * 3)
+        self.assertEqual(output.getvalue().count('both'), 1)
+        self.assertIn('synthetic figure', output.getvalue())
+
+        output = StringIO()
+        with redirect_stdout(output):
+            empty = ns['report_outside_axis_points']('empty figure', [(
+                'panel', ['inside'], [5.], [5.], (0., 10.), (0., 10.),
+            )])
+        self.assertTrue(empty.empty)
+        self.assertIn('No points outside axis limits — empty figure.', output.getvalue())
 
     def test_review_table_preserves_flagged_order_values_and_display_precision(self):
         ns = self.namespace([[3, 4, 5]] * 5, [30., 20., 60., 35., 31.])
@@ -497,6 +526,7 @@ class TorontoReportVolumeQualityTests(unittest.TestCase):
     def test_display_boundaries_are_inclusive(self):
         # Test exact display coordinates independently of ellipsoid arithmetic.
         quality = pd.DataFrame(dict(
+            ID=[f'AIPR_p{i}_20260101_s{i}' for i in range(9)],
             mean_volume_ml=[10, 300, 50, 50, 9, 301, 50, 50, 301],
             difference_ml=[0, 0, -40, 40, 0, 0, -41, 41, 41],
             classification=['Within range'] * 9,

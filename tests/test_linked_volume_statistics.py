@@ -179,7 +179,7 @@ class LinkedVolumeStatisticsTests(unittest.TestCase):
 
     def test_volume_summary_rmspe_and_zero_prediction(self):
         summary_source = SOURCE[SOURCE.index("gt = volumes['gt_volume_ml']"):
-                                SOURCE.index('# %% [markdown]\n# ## Agreement plots')]
+                                SOURCE.index('# %% [markdown]\n# ## Manual–automated disagreement flags')]
         volumes = pd.DataFrame(dict(gt_volume_ml=[10., 100.], a_volume_ml=[0., 110.]))
         with tempfile.TemporaryDirectory() as directory:
             ns = dict(np=np, pd=pd, volumes=volumes, SELECTED_COMPARATORS=['a'],

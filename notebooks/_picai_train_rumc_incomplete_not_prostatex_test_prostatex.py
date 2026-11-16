@@ -11,13 +11,14 @@
 # masks. Training labels remain Bosma22b AI surrogate annotations. Exclude every
 # PROSTATEx-mapped patient from training, including ambiguous links and repeats.
 # Testing requires one mapped exam and a finite positive clinical ellipsoid
-# volume (mL) and adequate source-image prostate coverage: 188 of 193 mapped
-# cases qualify. Record all exclusions in the audit.
+# volume (mL) and no manual-mask contact with the superior or inferior image face.
+# Boundary-contact cases are saved in excluded_due_to_boundary_contact.
+# Record all exclusions in the audit; training selection is unchanged.
 #
 # Run cells in order, or execute this file with the project Python environment.
 # Write the manifest under configs/ and selection audits under
 # results/picai_rumc_incomplete_not_prostatex/. All selected training and testing
-# paths are checked. No downloads, image processing, preprocessing, training, or
+# paths and manual-mask/image geometry are checked. No downloads, preprocessing, training, or
 # inference are performed. Selection is deterministic; no random seed is needed.
 
 # %% [markdown]
@@ -27,6 +28,7 @@
 import json
 from pathlib import Path
 
+import nibabel as nib
 import numpy as np
 import pandas as pd
 from IPython.display import display
@@ -179,13 +181,12 @@ assert set(training['patient_id']) == set(audit.loc[audit['training_eligible_pat
 # Retain all links for ambiguous IDs when checking overlap, since
 # choosing one link could miss a shared training patient. Original PROSTATEx T2
 # images are paired with mask_prostate annotations, never PI-CAI AI labels.
-# Visual quality review excludes ProstateX-0031 (PI-CAI 10804_1000820): the
-# source image crop provides insufficient prostate coverage. The segmentation
-# touches the superior boundary, and approximately 12.42% (5.412 mL) of manual
-# reference volume lies outside the PI-CAI grid. Apply this case-level source
-# quality exclusion to every testing comparator, not only Bosma22b.
-# Visual review also excludes ProstateX-0042 (PI-CAI 10180_1000183): the large
-# prostate is poorly covered by the cropped field of view, for the same reason.
+# Exclude every locally indexed manual whole-gland mask with any foreground
+# voxel (>0 foreground voxels) on the superior or inferior outer image face,
+# determined from the mask affine, without an area threshold or a
+# case-ID exception. Boundary contact is an operational cohort rule, not proof
+# of anatomical truncation. Check every local case. Mapping/clinical
+# ineligibility takes precedence over assignment to the boundary-contact fold.
 # Review the generated candidate before manually copying it to the active
 # configs/rumcnotprostatexnoclinical_folds.json; this notebook does not update it.
 
@@ -222,26 +223,53 @@ testing['clinical_volume_ml'] = pd.to_numeric(testing['prostate_volume'], errors
 testing['has_valid_clinical_volume'] = (
     np.isfinite(testing['clinical_volume_ml']) & testing['clinical_volume_ml'].gt(0)
 )
-testing['has_source_image_quality_issue'] = testing['ID'].isin(['ProstateX-0031', 'ProstateX-0042'])
-testing['testing_eligible'] = (
+# Verify the mask grid matches its source image before testing outer faces.
+boundary_contacts = []
+for row in testing.itertuples(index=False):
+    image = nib.load(PROSTATEX_ROOT / row.t2)
+    mask_img = nib.load(PROSTATEX_ROOT / row.label_wg)
+    assert len(mask_img.shape) == 3 and mask_img.shape == image.shape, (row.ID, 'Mask/image shape mismatch')
+    assert mask_img.header.get_xyzt_units()[0] == image.header.get_xyzt_units()[0] == 'mm', row.ID
+    corners = np.array(np.meshgrid(*[(0, n - 1) for n in mask_img.shape], indexing='ij')).reshape(3, -1).T
+    displacement = np.linalg.norm(nib.affines.apply_affine(mask_img.affine, corners)
+                                  - nib.affines.apply_affine(image.affine, corners), axis=1).max()
+    assert np.isfinite(displacement) and displacement <= .5, (row.ID, 'Mask/image geometry mismatch')
+    data = np.asanyarray(mask_img.dataobj)
+    assert np.isin(data, [0, 1]).all() and (data == 1).any(), (row.ID, 'Expected nonempty binary manual mask')
+    faces = []
+    axis_codes = nib.aff2axcodes(mask_img.affine)
+    si_axis = next(axis for axis, code in enumerate(axis_codes) if code in ('S', 'I'))
+    directions = ('I', 'S') if axis_codes[si_axis] == 'S' else ('S', 'I')
+    for direction, index in zip(directions, [0, -1]):
+        if np.count_nonzero(np.take(data, index, axis=si_axis)) > 0:
+            faces.append(direction)
+    boundary_contacts.append(';'.join(faces))
+testing['boundary_contact_faces'] = boundary_contacts
+testing['has_boundary_contact'] = testing['boundary_contact_faces'].ne('')
+testing['otherwise_eligible'] = (
     testing['mapping_count'].eq(1) & testing['has_marksheet_exam'] & testing['has_valid_clinical_volume']
-    & ~testing['has_source_image_quality_issue']
 )
+testing['testing_eligible'] = testing['otherwise_eligible'] & ~testing['has_boundary_contact']
 testing['exclusion_reason'] = np.select(
-    [testing['has_source_image_quality_issue'], testing['mapping_count'].eq(0),
-     testing['mapping_count'].gt(1), ~testing['has_marksheet_exam'], ~testing['has_valid_clinical_volume']],
-    ['insufficient_source_image_prostate_coverage', 'no_mapping', 'ambiguous_mapping', 'missing_marksheet_exam',
-     'missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume'],
+    [testing['mapping_count'].eq(0), testing['mapping_count'].gt(1),
+     ~testing['has_marksheet_exam'], ~testing['has_valid_clinical_volume'], testing['has_boundary_contact']],
+    ['no_mapping', 'ambiguous_mapping', 'missing_marksheet_exam',
+     'missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume', 'manual_mask_boundary_contact'],
     default='',
 )
-testing['assignment'] = np.where(testing['testing_eligible'], 'testing', 'excluded')
+testing['assignment'] = np.select(
+    [~testing['otherwise_eligible'], testing['has_boundary_contact']],
+    ['excluded_due_to_ineligibility', 'excluded_due_to_boundary_contact'], default='testing',
+)
 testing_audit = testing.copy()
+boundary_excluded = testing.loc[testing['assignment'].eq('excluded_due_to_boundary_contact')].copy()
+ineligible = testing.loc[testing['assignment'].eq('excluded_due_to_ineligibility')].copy()
 testing = testing.loc[testing['assignment'].eq('testing')].copy()
 assert not testing.empty, 'No mapped PROSTATEx testing cases'
 assert testing['mapping_count'].eq(1).all(), 'Testing requires unambiguous mapped exams'
 assert testing['has_valid_clinical_volume'].all(), 'Invalid testing clinical volume'
 display(testing_audit['linkage_status'].value_counts().rename_axis('status').to_frame('prostatex_cases'))
-display(testing_audit.loc[testing_audit['assignment'].eq('excluded'),
+display(testing_audit.loc[testing_audit['assignment'].ne('testing'),
                          ['ID', 'picai_keys', 'prostate_volume', 'exclusion_reason']])
 
 # %% [markdown]
@@ -254,8 +282,10 @@ display(testing_audit.loc[testing_audit['assignment'].eq('excluded'),
 # mapped identities, ProstateX-0025 has two mapped exams and is excluded rather
 # than choosing a volume arbitrarily (99.5 versus 95 mL). Of the remaining 192,
 # ProstateX-0071 and ProstateX-0149 have missing volumes, leaving 190 cases.
-# Exclude ProstateX-0031 and ProstateX-0042 for insufficient source-image
-# prostate coverage, leaving 188 testing cases.
+# Any superior/inferior manual-mask contact removes 33 of the 190 clinically eligible
+# cases, leaving 157 testing cases. The 14 otherwise ineligible cases go to
+# excluded_due_to_ineligibility, including four with boundary contact. Thus
+# 157 testing + 33 boundary exclusions + 14 ineligible = 204 local cases.
 
 # %%
 no_complete = audit.loc[~audit['patient_has_complete_exam']]
@@ -284,8 +314,8 @@ testing_flow = pd.DataFrame([
          testing_audit.loc[testing_audit.exclusion_reason.eq('missing_marksheet_exam')]),
         ('PROSTATEx: invalid clinical volume (excluded)', testing_audit.loc[
             testing_audit.exclusion_reason.eq('missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume')]),
-        ('PROSTATEx: insufficient source-image prostate coverage (excluded)', testing_audit.loc[
-            testing_audit.exclusion_reason.eq('insufficient_source_image_prostate_coverage')]),
+        ('PROSTATEx: otherwise ineligible (excluded)', ineligible),
+        ('PROSTATEx: eligible with superior/inferior manual-mask contact (excluded)', boundary_excluded),
         ('Testing: clinical volume and original images/manual whole-gland masks', testing),
     ]
 ])
@@ -297,8 +327,11 @@ assert (len(eligible), len(training)) == (239, 236), 'RUMC training counts chang
 assert len(testing_audit) == 204, 'Local PROSTATEx index changed'
 assert testing_audit.mapping_count.gt(0).sum() == 193, 'Mapped PROSTATEx cohort changed'
 assert testing_audit.mapping_count.eq(1).sum() == 192, 'Unambiguous PROSTATEx cohort changed'
-assert len(testing) == 188, 'Quality- and volume-eligible PROSTATEx testing count changed'
-assert not testing['has_source_image_quality_issue'].any(), 'Source-image quality exclusion failed'
+assert len(testing) == 157, 'Quality- and volume-eligible PROSTATEx testing count changed'
+assert not testing['has_boundary_contact'].any(), 'Boundary-contact exclusion failed'
+assert len(boundary_excluded) == 33, 'Eligible manual-mask boundary-contact count changed'
+assert len(ineligible) == 14, 'Otherwise ineligible count changed'
+assert len(testing) + len(boundary_excluded) + len(ineligible) == len(testing_audit), 'Incomplete PROSTATEx partition'
 display(flow)
 display(audit.groupby('selection_reason').agg(examinations=('ID', 'size'), patients=('patient_id', 'nunique')))
 
@@ -326,31 +359,34 @@ for row in training.sort_values(['patient_id', 'visit_date', 'marksheet_row']).i
         'label': label_path.relative_to(DATA_ROOT).as_posix(),
         'id': f'picai_{row.ID}',
     })
-testing_entries = []
-for row in testing.itertuples(index=False):
-    assert isinstance(row.t2, str) and row.t2.strip(), 'Missing PROSTATEx T2 path'
-    assert isinstance(row.label_wg, str) and row.label_wg.strip(), 'Missing manual whole-gland mask'
-    image_path = (PROSTATEX_ROOT / row.t2).resolve()
-    label_path = (PROSTATEX_ROOT / row.label_wg).resolve()
-    assert image_path.is_relative_to((MANUAL_ROOT / 'Images').resolve()), 'Unexpected PROSTATEx image source'
-    assert label_path.is_relative_to((MANUAL_ROOT / 'mask_prostate').resolve()), 'Testing requires manual whole-gland masks'
-    for path in (image_path, label_path):
-        if not path.is_file():
-            raise FileNotFoundError(path)
-    testing_entries.append({
-        'image': image_path.relative_to(DATA_ROOT).as_posix(),
-        'label': label_path.relative_to(DATA_ROOT).as_posix(),
-        'id': row.ID,
-    })
-folds = {'training': entries, 'testing': testing_entries}
+folds = {'training': entries}
+selected_path_rows = []
+for fold_name, frame in [('testing', testing), ('excluded_due_to_boundary_contact', boundary_excluded),
+                         ('excluded_due_to_ineligibility', ineligible)]:
+    fold_entries = []
+    for row in frame.itertuples(index=False):
+        assert isinstance(row.t2, str) and row.t2.strip(), 'Missing PROSTATEx T2 path'
+        assert isinstance(row.label_wg, str) and row.label_wg.strip(), 'Missing manual whole-gland mask'
+        image_path = (PROSTATEX_ROOT / row.t2).resolve()
+        label_path = (PROSTATEX_ROOT / row.label_wg).resolve()
+        assert image_path.is_relative_to((MANUAL_ROOT / 'Images').resolve()), 'Unexpected PROSTATEx image source'
+        assert label_path.is_relative_to((MANUAL_ROOT / 'mask_prostate').resolve()), 'Expected manual whole-gland masks'
+        for path in (image_path, label_path):
+            if not path.is_file():
+                raise FileNotFoundError(path)
+        entry = dict(image=image_path.relative_to(DATA_ROOT).as_posix(),
+                     label=label_path.relative_to(DATA_ROOT).as_posix(), id=row.ID)
+        fold_entries.append(entry)
+        selected_path_rows.append(dict(ID=row.ID, image=entry['image'], label=entry['label']))
+    folds[fold_name] = fold_entries
 for field in ('id', 'image', 'label'):
-    train_values = {entry[field] for entry in entries}
-    test_values = {entry[field] for entry in testing_entries}
-    assert len(train_values) == len(entries), f'Duplicate training {field}'
-    assert len(test_values) == len(testing_entries), f'Duplicate testing {field}'
-    assert train_values.isdisjoint(test_values), f'Training/testing {field} overlap'
-testing['image'] = [entry['image'] for entry in testing_entries]
-testing['label'] = [entry['label'] for entry in testing_entries]
+    seen = set()
+    for fold_name, fold_entries in folds.items():
+        values = {entry[field] for entry in fold_entries}
+        assert len(values) == len(fold_entries), f'Duplicate {fold_name} {field}'
+        assert seen.isdisjoint(values), f'Cross-fold {field} overlap'
+        seen.update(values)
+testing_entries = folds['testing']
 manifest_text = json.dumps(folds, indent=4, allow_nan=False) + '\n'
 
 MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -358,11 +394,15 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 MANIFEST_PATH.write_text(manifest_text)
 audit.sort_values('marksheet_row').to_csv(OUTPUT_DIR / 'selection_audit.csv', index=False)
 flow.to_csv(OUTPUT_DIR / 'cohort_flow.csv', index=False)
-testing_audit = testing_audit.merge(testing[['ID', 'image', 'label']], on='ID', how='left', validate='one_to_one')
+testing_audit = testing_audit.merge(pd.DataFrame(selected_path_rows), on='ID', how='left', validate='one_to_one')
 testing_audit.to_csv(OUTPUT_DIR / 'testing_audit.csv', index=False)
 print(f'Wrote {MANIFEST_PATH}')
 print(f'Wrote selection_audit.csv, testing_audit.csv, and cohort_flow.csv to {OUTPUT_DIR}')
 print(f'Training: {len(entries)} RUMC exams / {training.patient_id.nunique()} patients; testing: {len(testing_entries)} manual PROSTATEx cases')
 print(f'PROSTATEx cases excluded without a PI-CAI mapping: {testing_audit.mapping_count.eq(0).sum()}')
 print('PROSTATEx testing exclusions by reason:')
-print(testing_audit.loc[testing_audit.assignment.eq('excluded'), 'exclusion_reason'].value_counts())
+print(testing_audit.loc[testing_audit.assignment.ne('testing'), 'exclusion_reason'].value_counts())
+
+print(f"Boundary-contact fold: {len(folds['excluded_due_to_boundary_contact'])} manual PROSTATEx cases")
+print(f"Ineligible fold: {len(folds['excluded_due_to_ineligibility'])} manual PROSTATEx cases")
+print(f'PROSTATEx total: {len(testing)} + {len(boundary_excluded)} + {len(ineligible)} = {len(testing_audit)}')

@@ -248,14 +248,15 @@ comparison tables and figures, go to
 ## Linked PROSTATEx clinical-volume analysis
 
 [prostatex_linked_clinical_volume.py](prostatex_linked_clinical_volume.py) reconstructs
-the reviewed testing cohort (currently 189 cases), retains all clinical marksheet fields, and compares
+the reviewed testing cohort (currently 157 cases), retains all clinical marksheet fields, and compares
 clinical prostate volume with manual whole-gland segmentation volume in mL.
 Outputs are written to [results/prostatex_linked_volume](../results/prostatex_linked_volume/).
 
 Inputs:
 
 - [Reviewed testing manifest](../configs/rumcnotprostatexnoclinical_folds.json):
-  `testing` defines cohort membership and order; `excluded` retains reviewed exclusions.
+  `testing` defines cohort membership and order; named `excluded_*` folds retain
+  boundary-contact and mapping/clinical ineligibility exclusions.
 - [PROSTATEx mask index](../data/raw/github/prostatex_masks/index.csv): image paths
   and manual whole-gland masks (`label_wg`), relative to the index directory.
 - [PROSTATEx–PI-CAI mapping](../data/raw/zenodo/picai/picai_labels/additional_resources/ProstateX-mapping.json):
@@ -273,26 +274,30 @@ examination and unique-patient counts and exclusions relative to each preceding 
 | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
 | Matched clinical marksheet | 192 | All remaining examinations match |
 | Valid clinical volume before testing-fold selection | 190 | Two lack usable clinical volume |
-| Reviewed testing fold: volume analysis | **189** | ProstateX-0031 excluded for insufficient source-image coverage |
-| PSA available: subsequent density analysis | **188** | ProstateX-0202 lacks PSA |
+| Reviewed testing fold: volume analysis | **157** | Exclude 33 otherwise eligible masks with superior/inferior boundary contact |
+| PSA available: subsequent density analysis | **156** | ProstateX-0202 lacks PSA |
 
 The testing fold is authoritative; metadata validates rather than expands it.
 Duplicate or missing selected IDs, invalid clinical linkage or volume, and
 image/manual-mask paths inconsistent with the index stop execution. The full
-linkage audit retains cases outside the testing fold. ProstateX-0031 records
-`insufficient_source_image_prostate_coverage` following visual quality review.
+linkage audit retains cases outside the testing fold, including their
+`exclusion_fold`. The approved manifest partitions 204 local cases into 157
+`testing`, 33 `excluded_due_to_boundary_contact`, and 14
+`excluded_due_to_ineligibility` cases. The latter includes four cases also showing
+boundary contact; mapping/clinical ineligibility takes precedence. No case-ID
+exception list is used by the linked analysis.
 Clinical consistency flags remain review-only and do not remove selected cases.
 
-Clinical consistency is assessed for the 180 complete valid PSA/volume/reported-PSAD
+Clinical consistency is assessed for the 150 complete valid PSA/volume/reported-PSAD
 triples. Flag **|reported PSAD − PSA / clinical volume| > 0.01 ng/mL²** for review
 only; equality passes, allowing numerical roundoff. The threshold is configurable
-and is not documented source precision. Current inputs flag **22 cases**, including
+and is not documented source precision. Current inputs flag **19 cases**, including
 ProstateX-0037. Missing/invalid clinical assessments have separate statuses. No review
 flag or missing reported PSAD excludes a case from volume or recalculated density
 analysis, and a flag does not establish which field, if any, is wrong.
 
 The top cells export `cohort_flow.csv`, `cohort_linkage_audit.csv`, and the complete
-189-case `clinical_consistency_audit.csv`. All 189 selected cases are measured once and
+157-case `clinical_consistency_audit.csv`. All 157 selected cases are measured once and
 retained in both `comparator_volumes_all_cases.csv` and `comparator_volumes.csv`.
 `clinical_suspicious_cases.csv` contains a compact table of every flagged case;
 `clinical_case_review.csv` preserves their complete marksheet fields, identifiers,
@@ -350,7 +355,7 @@ historical checkpoints or ensemble folds produced the masks. The five-fold
 settings above describe the exported bundle configuration.
 
 For the linked PROSTATEx notebook, use the **PROSTATEx prediction directory** and
-match by PROSTATEx ID. All 189 selected cases already have predictions, so no new inference
+match by PROSTATEx ID. All 157 selected cases already have predictions, so no new inference
 is needed. The notebook calculates Dataset274 and Dataset609 label-1 whole-gland volumes in
 mL on each prediction's native grid, and compares both clinical and model volumes
 against ground truth. Per-case exports include prediction paths, voxel counts,
@@ -371,7 +376,7 @@ and are matched by PROSTATEx ID. Both model sources validate dataset identity an
 binary label metadata before measuring whole-gland label 1. Bosma22b remains
 optional, labeled **Bosma22b**, with its own plotting style.
 Clinical volume comes from the marksheet. HeviAI23 and Yuan23 whole gland is the union of labels 1 and 2.
-Volume comparisons retain all 189 selected cases, including suspicious records; masks are
+Volume comparisons retain all 157 selected cases, including suspicious records; masks are
 measured on native grids without resampling. This evaluates volume accuracy, not spatial overlap.
 
 The generic outputs replace the former hardcoded comparison outputs:
@@ -434,9 +439,9 @@ The same notebook continues with PSA density = PSA (ng/mL) / volume (mL), in
 Each selected comparator uses that same PSA with its own volume measurement.
 The marksheet's reported `psad` is examined separately at the end.
 
-The density audit retains all 189 selected volume-analysis cases. At this step, remove only
-missing/nonfinite PSA (currently ProstateX-0202), leaving **188 density cases**.
-The eight cases with PSA but missing reported PSAD remain eligible, as do all
+The density audit retains all 157 selected volume-analysis cases. At this step, remove only
+missing/nonfinite PSA (currently ProstateX-0202), leaving **156 density cases**.
+Cases with PSA but missing reported PSAD remain eligible, as do all
 suspicious records. Finite PSA must be positive and reference and selected-method
 volumes must be finite positive: unexpected nonpositive PSA or invalid/empty-volume
 predictions are audited and stop execution rather than silently shrink the cohort.
@@ -486,12 +491,12 @@ New files under `results/prostatex_linked_volume/`:
 
 ## Reported marksheet PSA density
 
-The reported-density cells use the complete 189-case volume cohort, including suspicious
+The reported-density cells use the complete 157-case volume cohort, including suspicious
 records, for separately labeled reporting diagnostics. They compare reported
 `psad` against **PSA / clinical volume** and
 **PSA / manual-mask volume**. They also compare recalculated clinical density with
 manual-mask density on the same complete cases. This subset is independent of
-prediction-method selection; current inputs provide **180 complete reported-density
+prediction-method selection; current inputs provide **150 complete reported-density
 cases**. The audit records missing/invalid reports separately. Nonnegative
 reported density is valid; a zero report has undefined implied volume and is
 omitted from log-density display, but remains in statistics and strata.
@@ -529,7 +534,7 @@ numeric PI-RADS score is 3**. It ignores missing/`N/A` entries and rejects score
 outside integers 1–5. Cases with a PI-RADS 4/5 lesion are excluded even if another
 lesion is PI-RADS 3. Only an absent PI-RADS column triggers the full-cohort
 fallback; unavailable scores or an empty subgroup do not. Current local inputs
-yield **26 eligible cases: 5 with csPCa and 21 without**.
+yield **23 eligible cases: 5 with csPCa and 18 without**.
 
 The simulated decision recommends biopsy when **unrounded calculated PSAD is
 ≥ 0.15 ng/mL²**, including equality. It evaluates manual-mask density and all
@@ -560,7 +565,7 @@ and do not establish routine-care performance or prevalence.
 ## Study segmentation performance
 
 The study notebook also compares supplied **Bosma22b** whole-gland label-1
-masks with the same 190 ProstateX manual references using `ProstateX-mapping.json`.
+masks with the same 157 ProstateX manual references using `ProstateX-mapping.json`.
 It runs no inference for this comparator and exports mean DSC, MAE/RMSE (mL),
 and MAPE/RMSPE (%). Missing or ambiguous mappings and invalid geometry are
 audited; aggregates require complete coverage. Bosma22b masks are reoriented to
@@ -569,7 +574,7 @@ resolutions or physical crops differ, using stored affines without fitting a
 registration. Different field boundaries are permitted; nonoverlapping grids
 are rejected. Voxels outside source coverage are background, so missed reference
 anatomy contributes to DSC error. Volume errors use native-grid counts and voxel
-volumes. All 190 cases evaluate successfully. Source-image diagnostics confirmed
+volumes. All 157 selected cases evaluate successfully. Source-image diagnostics confirmed
 that the 18 differing crops match their PI-CAI Bosma22b source grids; these were
 not established patient-mapping errors.
 Bosma22b training membership
@@ -639,3 +644,87 @@ CSV. Geometry comparisons use effective affines, not other header metadata. Repo
 model, cohort, and case ID in manifest order. Counts are
 evaluated/expected scans. No command files, snapshots, or completion markers are
 created by the notebook.
+
+## Disagreement-based quality improvement
+
+[volume_disagreement_quality_improvement.py](volume_disagreement_quality_improvement.py)
+screens manual ellipsoid versus nnUNet274 volumes without using reference volume.
+The primary screen requires signed disagreement outside mean ±1.96 sample SD
+on **both** the mL and symmetric percentage scales, fitting each complete cohort
+separately. Percentage disagreement uses the pair mean. Individual-scale and
+union screens are descriptive secondary analyses.
+
+Run the ProstateX source notebook through its agreement-figure cell first to
+refresh `manual_automated_disagreement_flags.csv` and the highlighted PNG/PDF.
+Then run:
+
+```bash
+MPLBACKEND=Agg .venv/bin/python notebooks/volume_disagreement_quality_improvement.py
+```
+
+Inputs are existing volume, PSAD, biopsy-audit, and provenance exports from
+ProstateX, Toronto manual-reference, and expanded Toronto notebooks. The expanded
+directory retains `4111` in its name; membership and counts follow the current
+source notebook and saved metadata (currently 4,105). Input checks reject stale
+membership, measurements, or eligibility exports. CSV floats use round-trip
+parsing to preserve unrounded PSAD cutoff assignments.
+
+Outputs under `results/volume_disagreement_quality_improvement/` include full
+case flags and screening thresholds; volume metrics, review burden, paired
+improvement/worsening summaries and primary inference; PSAD category transitions
+and exact McNemar comparisons; biopsy eligibility, reference-decision agreement,
+and known-outcome confusion counts; paired signed-error PNG/PDF; and input hashes.
+The volume accuracy and review burden section prints every strict-intersection
+outlier's ID, available image path, reference and manual volumes, and every
+automated method volume available in the source export, without truncating rows
+or columns. This local review table is also saved as `outlier_case_volumes.csv`;
+reference type is labeled explicitly for each cohort.
+
+Primary inference retains 100,000 resamples and seeds 20261102/20261103. RMSE and
+sign tests form a two-test Holm family per cohort; RMSPE and PSAD-category tests
+have separate one-test families. Thresholds and selected patients stay fixed
+during resampling. Small groups and post-selection uncertainty limit inference.
+Unknown cancer outcomes remain eligible for reference-decision comparisons but
+are excluded from cancer-outcome metrics. Empty groups have zero counts and
+undefined rates. Toronto cohorts overlap, and nnUNet702 is an automated surrogate,
+so expanded results are neither manual-ground-truth validation nor independent
+replication. The notebook performs no downloads, training, or inference.
+
+## ProstateX manual-mask field-of-view contact
+
+[prostatex_manual_mask_fov_contact.py](prostatex_manual_mask_fov_contact.py)
+checks all 204 local manual whole-gland masks against their paired image geometry,
+separating the reviewed testing cohort, explicitly excluded cases, and other local
+cases. It reports contact area per outer face (mm²), terminal-slice gland volume
+(mL), union boundary-volume fraction, and contact area relative to the largest
+parallel gland cross-section. Canonical reorientation uses no interpolation.
+
+Outputs are saved under `results/prostatex_manual_mask_fov_contact/` as
+`case_contact.csv`, `face_contact.csv`, `summary.csv`, and
+`normalized_summary.csv`. Absolute-area and gland-size-normalized thresholds are
+descriptive review screens; contact alone does not establish truncation or justify
+an automatic exclusion. No dataset membership or masks are changed.
+
+## Candidate ProstateX cohort without manual-mask boundary contact
+
+[_picai_rumc_incomplete_not_prostatex.py](_picai_rumc_incomplete_not_prostatex.py)
+checks every local manual whole-gland mask against its paired image grid.
+A foreground voxel (>0 voxels) on the superior or inferior outer face is boundary
+contact; the affine determines anatomical orientation. Other faces are ignored.
+There is no area threshold or case-specific exclusion list.
+
+The candidate partitions all 204 local ProstateX cases into disjoint folds:
+
+| Fold | Cases | Rule |
+|---|---:|---|
+| `testing` | 157 | Valid mapping/clinical volume and no S/I boundary contact |
+| `excluded_due_to_boundary_contact` | 33 | Otherwise eligible, with S/I boundary contact |
+| `excluded_due_to_ineligibility` | 14 | 11 unmapped, 1 ambiguous mapping, 2 invalid clinical volumes |
+
+Mapping/clinical ineligibility takes precedence: four of the 14 ineligible cases
+also have boundary contact, which remains recorded in the audit. The three folds
+sum to 204 and preserve normal `id`, `image`, and manual `label` paths. The separate
+`training` fold contains 236 unchanged PI-CAI RUMC cases and is not part of the
+ProstateX total. Boundary contact is an operational rule, not proof of truncation.
+Review and manually copy the candidate to the active manifest before refreshing
+downstream analyses; generation does not modify the active manifest or results.

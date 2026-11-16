@@ -93,6 +93,9 @@ for model in MODELS:
         cohort['data_root'] = (REPO_ROOT / config['dataroot']).resolve()
         cohort['manifest_data'] = json.loads(cohort['manifest'].read_text())
         cohort['rows'] = cohort['manifest_data'][cohort['split']]
+        excluded_ids = {row['id'] for name, rows in cohort['manifest_data'].items()
+                        if name == 'excluded' or name.startswith('excluded_') for row in rows}
+        assert not {row['id'] for row in cohort['rows']} & excluded_ids, 'Requested split overlaps excluded cases'
         cohort['output'] = STUDY_ROOT / cohort['model'] / cohort['key']
         invocation = [
             ['.venv/bin/python', str((bundle / 'scripts/infer.py').relative_to(REPO_ROOT))],

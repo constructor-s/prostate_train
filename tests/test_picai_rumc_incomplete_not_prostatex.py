@@ -1,6 +1,9 @@
 """Exercise the RUMC generator's actual selection cells with synthetic visits."""
 from pathlib import Path
 import unittest
+import tempfile
+
+import nibabel as nib
 
 import numpy as np
 import pandas as pd
@@ -19,6 +22,27 @@ TESTING_SOURCE = SOURCE[
 
 
 class RumcIncompleteSelectionTests(unittest.TestCase):
+    def prepare_masks(self, namespace, boundary_faces=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        cases = namespace['prostatex'].copy()
+        cases['t2'] = cases.ID + '_image.nii.gz'
+        cases['label_wg'] = cases.ID + '_mask.nii.gz'
+        boundary_faces = boundary_faces or {}
+        for row in cases.itertuples(index=False):
+            data = np.zeros((5, 5, 5), dtype=np.uint8)
+            data[2, 2, 2] = 1
+            for axis, index in boundary_faces.get(row.ID, []):
+                coord = [2, 2, 2]
+                coord[axis] = index
+                data[tuple(coord)] = 1
+            image = nib.Nifti1Image(data, np.eye(4))
+            image.header.set_xyzt_units('mm')
+            nib.save(image, root / row.t2)
+            nib.save(image, root / row.label_wg)
+        namespace.update(prostatex=cases, PROSTATEX_ROOT=root, nib=nib)
+
     def select(self, visits, mapping=None):
         rows = []
         for i, visit in enumerate(visits):
@@ -112,22 +136,63 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
             marksheet=pd.DataFrame({'patient_id': [10804, 10180, 3],
                                     'study_id': [1000820, 1000183, 300],
                                     'prostate_volume': [50., 196., 60.]}))
+        self.prepare_masks(namespace, {'ProstateX-0031': [(2, -1)], 'ProstateX-0042': [(2, 0)]})
         exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
         self.assertEqual(namespace['testing'].ID.tolist(), ['ProstateX-0001'])
         row = namespace['testing_audit'].set_index('ID').loc['ProstateX-0031']
-        self.assertEqual(row.assignment, 'excluded')
-        self.assertEqual(row.exclusion_reason, 'insufficient_source_image_prostate_coverage')
+        self.assertEqual(row.assignment, 'excluded_due_to_boundary_contact')
+        self.assertEqual(row.exclusion_reason, 'manual_mask_boundary_contact')
         self.assertEqual(row.picai_key, '10804_1000820')
         self.assertTrue(row.has_valid_clinical_volume)
-        self.assertTrue(row.has_source_image_quality_issue)
+        self.assertTrue(row.has_boundary_contact)
         second = namespace['testing_audit'].set_index('ID').loc['ProstateX-0042']
-        self.assertEqual(second.assignment, 'excluded')
-        self.assertEqual(second.exclusion_reason, 'insufficient_source_image_prostate_coverage')
+        self.assertEqual(second.assignment, 'excluded_due_to_boundary_contact')
+        self.assertEqual(second.exclusion_reason, 'manual_mask_boundary_contact')
         self.assertEqual(second.picai_key, '10180_1000183')
-        self.assertTrue(second.has_source_image_quality_issue)
+        self.assertTrue(second.has_boundary_contact)
         self.assertTrue(second.has_valid_clinical_volume)
         pd.testing.assert_frame_equal(namespace['training'], training_before)
         self.assertEqual(namespace['training'].patient_id.tolist(), [2])
+
+    def test_only_single_superior_or_inferior_voxel_excludes_case(self):
+        ids = [f'case{i}' for i in range(7)]
+        namespace = dict(prostatex=pd.DataFrame({'ID': ids}),
+                         mapping={f'{case}_date': f'{i+1}_{i+100}' for i, case in enumerate(ids)},
+                         marksheet=pd.DataFrame({'patient_id': range(1, 8),
+                                                 'study_id': range(100, 107), 'prostate_volume': 50.}),
+                         training=pd.DataFrame({'patient_id': [99], 'ID': ['99_999']}),
+                         np=np, pd=pd, display=lambda *args: None)
+        faces = [(axis, side) for axis in range(3) for side in (0, -1)]
+        self.prepare_masks(namespace, {case: [face] for case, face in zip(ids, faces)})
+        exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
+        self.assertEqual(namespace['testing'].ID.tolist(), ids[:4] + ['case6'])
+        self.assertEqual(namespace['boundary_excluded'].ID.tolist(), ids[4:6])
+        self.assertTrue(namespace['boundary_excluded'].boundary_contact_faces.ne('').all())
+        self.assertTrue(namespace['boundary_excluded'].exclusion_reason.eq('manual_mask_boundary_contact').all())
+        audit = namespace['testing_audit'].set_index('ID')
+        self.assertEqual(audit.loc['case4', 'boundary_contact_faces'], 'I')
+        self.assertEqual(audit.loc['case5', 'boundary_contact_faces'], 'S')
+        # The anatomical rule survives axis permutation and a reversed S/I axis.
+        root = namespace['PROSTATEX_ROOT']
+        for row in namespace['prostatex'].itertuples(index=False):
+            for name in (row.t2, row.label_wg):
+                image = nib.load(root / name)
+                image = image.as_reoriented(np.array([[2, -1], [1, 1], [0, 1]]))
+                nib.save(image, root / name)
+        exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
+        self.assertEqual(namespace['boundary_excluded'].ID.tolist(), ids[4:6])
+        audit = namespace['testing_audit'].set_index('ID')
+        self.assertEqual(audit.loc['case4', 'boundary_contact_faces'], 'I')
+        self.assertEqual(audit.loc['case5', 'boundary_contact_faces'], 'S')
+        # Ineligibility takes precedence; retain the boundary-contact audit flag.
+        namespace['marksheet'].loc[4, 'prostate_volume'] = np.nan
+        exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
+        self.assertEqual(len(namespace['boundary_excluded']), 1)
+        self.assertEqual(namespace['ineligible'].ID.tolist(), ['case4'])
+        self.assertTrue(namespace['ineligible'].has_boundary_contact.iloc[0])
+        self.assertEqual(namespace['ineligible'].exclusion_reason.iloc[0],
+                         'missing_nonnumeric_nonfinite_or_nonpositive_clinical_volume')
+        self.assertEqual(namespace['testing'].ID.tolist(), ids[:4] + ['case6'])
 
     def test_testing_excludes_unmapped_cases_and_checks_all_ambiguous_links(self):
         namespace = dict(
@@ -139,13 +204,15 @@ class RumcIncompleteSelectionTests(unittest.TestCase):
             training=pd.DataFrame({'patient_id': [3], 'ID': ['3_300']}),
             np=np, pd=pd, display=lambda *args: None,
         )
+        self.prepare_masks(namespace)
         exec(compile(TESTING_SOURCE, str(NOTEBOOK), 'exec'), namespace)
         testing = namespace['testing']
         self.assertEqual(testing.ID.tolist(), ['ProstateX-0003'])
         self.assertEqual(testing.mapping_count.tolist(), [1])
         self.assertEqual(testing.picai_keys.tolist(), ['4_400'])
         audit = namespace['testing_audit']
-        self.assertEqual(audit.assignment.tolist(), ['excluded', 'excluded', 'testing'])
+        self.assertEqual(audit.assignment.tolist(), ['excluded_due_to_ineligibility',
+                                                          'excluded_due_to_ineligibility', 'testing'])
         self.assertEqual(audit.picai_keys.iloc[0], '1_100,2_200')
         self.assertEqual(audit.exclusion_reason.iloc[0], 'ambiguous_mapping')
         self.assertEqual(audit.linkage_status.iloc[1], 'excluded_no_mapping')

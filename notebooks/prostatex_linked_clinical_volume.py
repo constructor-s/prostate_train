@@ -7,7 +7,9 @@
 # Then compare PSA densities computed from each volume and investigate the
 # marksheet's reported PSA density against recalculated and manual-mask densities.
 # Inputs are existing local downloads; this notebook performs no downloads or
-# inference. Run cells in order. Outputs go to `results/prostatex_linked_volume/`.
+# inference. Run cells in order after editing the reviewed testing manifest, then
+# rerun volume_disagreement_quality_improvement.py to refresh its downstream
+# screens. Outputs go to `results/prostatex_linked_volume/`.
 #
 # ## Study population and cohort flow
 #
@@ -16,8 +18,8 @@
 # supply the manual whole-gland masks and clinical measurements for this analysis.
 # Membership comes from the reviewed testing fold in
 # configs/rumcnotprostatexnoclinical_folds.json; metadata validates its cases.
-# ProstateX-0031 and ProstateX-0042 are excluded for insufficient source-image
-# prostate coverage; the large gland in ProstateX-0042 is poorly covered by its crop.
+# The approved manifest separately records 33 otherwise eligible masks with
+# superior/inferior boundary contact and 14 mapping/clinical ineligible cases.
 # Expected counts are recomputed below:
 #
 # | Stage | Examinations | Explanation |
@@ -27,15 +29,15 @@
 # | Unambiguous linkage | 192 | Remove both examinations of ProstateX-0025 |
 # | Matched clinical marksheet | 192 | All remaining examinations match |
 # | Valid clinical volume before testing-fold selection | 190 | Two lack usable clinical volume |
-# | Reviewed testing fold: volume analysis | **188** | Exclude ProstateX-0031 and ProstateX-0042 for insufficient image coverage |
-# | PSA available: subsequent density analysis | **187** | ProstateX-0202 lacks PSA |
+# | Reviewed testing fold: volume analysis | **157** | Exclude 33 otherwise eligible masks with superior/inferior contact |
+# | PSA available: subsequent density analysis | **156** | ProstateX-0202 lacks PSA |
 #
-# Keep all 188 selected volume cases, including suspicious records, for volume analysis.
-# Only at the density step remove missing/nonfinite PSA. Eight cases with PSA
-# but missing reported PSAD remain in recalculated density comparisons. The
-# separate reported-PSAD diagnostic uses its 179 complete valid clinical triples.
+# Keep all 157 selected volume cases, including suspicious records, for volume analysis.
+# Only at the density step remove missing/nonfinite PSA. Cases with PSA but
+# missing reported PSAD remain in recalculated density comparisons. The
+# separate reported-PSAD diagnostic uses the complete valid clinical triples reported below.
 # Flag |reported PSAD − PSA / clinical volume| > **0.01 ng/mL²** for review only
-# (22 current cases). This diagnostic threshold is not documented source precision
+# (counts are recomputed below). This diagnostic threshold is not documented source precision
 # and a flag does not identify which clinical field, if any, is wrong.
 
 # %%
@@ -103,7 +105,11 @@ manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
 testing_rows = manifest['testing']
 testing_ids = [row['id'] for row in testing_rows]
 assert testing_ids and len(testing_ids) == len(set(testing_ids)), 'Empty testing fold or duplicate testing IDs'
-assert not set(testing_ids) & {row['id'] for row in manifest.get('excluded', [])}, 'Testing/excluded overlap'
+exclusion_folds = {name: rows for name, rows in manifest.items()
+                   if name == 'excluded' or name.startswith('excluded_')}
+excluded_fold_by_id = {row['id']: name for name, rows in exclusion_folds.items() for row in rows}
+assert sum(map(len, exclusion_folds.values())) == len(excluded_fold_by_id), 'Duplicate IDs across exclusion folds'
+assert not set(testing_ids) & set(excluded_fold_by_id), 'Testing/excluded overlap'
 assert set(testing_ids) <= set(cases['ID']), 'Testing IDs missing from local mask index'
 EXPECTED_CASES = len(testing_ids)
 marksheet = pd.read_csv(MARKSHEET_PATH)
@@ -133,11 +139,13 @@ cohort['linkage_status'] = np.select(
     default='included',
 )
 cohort['in_testing_fold'] = cohort['ID'].isin(testing_ids)
+cohort['exclusion_fold'] = cohort['ID'].map(excluded_fold_by_id).fillna('')
+cohort['in_excluded_fold'] = cohort['exclusion_fold'].ne('')
 cohort['selection_status'] = np.where(cohort['in_testing_fold'], cohort['linkage_status'], 'not_in_testing_fold')
 cohort['exclusion_reason'] = np.where(cohort['in_testing_fold'], '', 'not_in_testing_fold')
-# This explains a documented exclusion; it does not independently select cases.
-quality_excluded = ~cohort['in_testing_fold'] & cohort['ID'].isin(['ProstateX-0031', 'ProstateX-0042'])
-cohort.loc[quality_excluded, 'exclusion_reason'] = 'insufficient_source_image_prostate_coverage'
+cohort.loc[cohort.exclusion_fold.eq('excluded_due_to_boundary_contact'), 'exclusion_reason'] = 'manual_mask_boundary_contact'
+cohort.loc[cohort.exclusion_fold.eq('excluded_due_to_ineligibility'), 'exclusion_reason'] = cohort['linkage_status']
+cohort.loc[cohort.exclusion_fold.eq('excluded'), 'exclusion_reason'] = 'excluded_by_reviewed_manifest'
 cohort.to_csv(OUTPUT_DIR / 'cohort_linkage_audit.csv', index=False)
 linked = cohort.set_index('ID', drop=False).loc[testing_ids].copy().reset_index(drop=True)
 assert linked['linkage_status'].eq('included').all(), 'Invalid testing-case linkage or clinical volume; inspect linkage audit'
@@ -170,7 +178,7 @@ for stage, frame, reason in [
     ('Valid clinical volume before testing-fold selection', cohort.loc[cohort.linkage_status.eq('included')],
      'Missing/nonfinite/nonpositive clinical volume'),
     ('Reviewed testing fold: volume analysis', linked,
-     'Not in reviewed testing fold; ProstateX-0031 and ProstateX-0042 have insufficient source-image prostate coverage'),
+     'Reviewed exclusions: superior/inferior manual-mask contact or mapping/clinical ineligibility'),
     ('PSA available: subsequent density analysis', linked.loc[psa_available], 'Missing/nonfinite PSA'),
 ]:
     n_examinations = len(frame)
@@ -290,7 +298,7 @@ volumes = linked.merge(pd.DataFrame(reference_rows), on='ID', validate='one_to_o
 # standardized study's `prostatex_original_train_mapped` folders. Their saved
 # `inference_config.json` files document a five-fold ensemble (folds 0–4),
 # tile step 0.8, and disabled mirroring. Predictions are matched by PROSTATEx ID
-# and use whole-gland label 1. Each folder contains 193 masks; only the selected 188
+# and use whole-gland label 1. Each folder contains 193 masks; only the selected testing-fold
 # eligible linked cases enter this analysis. Legacy Dataset609 remains optional
 # and uses its original prediction folder and historical inference settings.
 # PI-CAI masks are matched by patient/study ID.
@@ -924,7 +932,7 @@ pairwise_statistics.to_csv(OUTPUT_DIR / 'comparator_pairwise_statistics.csv', in
 # A separate analysis at the end examines that reported value.
 #
 # Retain all volume-analysis cases in this audit, then remove missing/nonfinite
-# PSA only (currently ProstateX-0202), giving 187 density cases. Reported PSAD and
+# PSA only (currently ProstateX-0202), currently giving 156 density cases. Reported PSAD and
 # review flags do not affect eligibility. Finite PSA must be positive and reference
 # and selected-method volumes must be finite positive; unexpected invalid values
 # stop execution rather than silently shrink the cohort. These requirements allow
@@ -1875,8 +1883,8 @@ else:
 # `N/A` entries; do not assign a numeric score when none is available. Scores mix
 # PI-RADS v1/2/2.1 according to the guidelines used at examination. Fall back to
 # the entire eligible linked cohort only when the column is absent, never when
-# the selected subgroup is empty. Current local data yield 26 eligible cases:
-# 5 with `case_ISUP >= 2` (csPCa) and 21 with `case_ISUP <= 1`.
+# the selected subgroup is empty. Current local data yield 23 eligible cases:
+# 5 with `case_ISUP >= 2` (csPCa) and 18 with `case_ISUP <= 1`.
 #
 # Simulate recommending biopsy at **unrounded PSA density >= 0.15 ng/mL²**;
 # equality recommends biopsy. Evaluate manual-mask density and every selected

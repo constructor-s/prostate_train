@@ -240,7 +240,7 @@ thresholds = pd.DataFrame(threshold_rows)
 flags = pd.concat(flag_tables, ignore_index=True)
 flags.to_csv(OUTPUT_DIR / 'case_audit.csv', index=False)
 thresholds.to_csv(OUTPUT_DIR / 'disagreement_thresholds.csv', index=False)
-for flag_cohort in ['prostatex', 'picai']:
+for flag_cohort in ['prostatex', 'toronto_manual', 'picai']:
     plot_root = REPO_ROOT / 'results' / COHORTS[flag_cohort][0]
     if flag_cohort == 'picai':
         plot_root = plot_root / SITE

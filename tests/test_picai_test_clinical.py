@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -29,9 +30,11 @@ class ClinicalCohortTests(unittest.TestCase):
                 visits = [*visits, dict(patient_id=999, contacts=[(2, 0)])]
             rows, images = [], []
             training_entries = []
+            poor_ids = set()
             for i, visit in enumerate(visits):
                 visit = visit.copy()
                 contacts = visit.pop('contacts', [])
+                poor_segmentation = visit.pop('poor_segmentation', False)
                 affine = visit.pop('affine', np.eye(4))
                 row = dict(patient_id=i + 1, study_id=100 + i, center='RUMC',
                            mri_date='2020-01-01', prostate_volume=50, psa=5,
@@ -40,6 +43,8 @@ class ClinicalCohortTests(unittest.TestCase):
                 row.update(visit)
                 rows.append(row)
                 case = f"{row['patient_id']}_{row['study_id']}"
+                if poor_segmentation:
+                    poor_ids.add(case)
                 data = np.zeros((5, 5, 5), dtype=np.uint8)
                 data[2, 2, 2] = 1
                 for axis, index in contacts:
@@ -59,6 +64,8 @@ class ClinicalCohortTests(unittest.TestCase):
             pd.DataFrame(images).to_csv(index_dir / 'images_nii.csv', index=False)
             code = SOURCE.replace("REPO_ROOT = Path(__file__).resolve().parents[1] if '__file__' in globals() else Path.cwd().resolve()",
                                   f'REPO_ROOT = Path({str(root)!r})')
+            code = re.sub(r'POOR_BOSMA22B_IDS = \{.*?\}',
+                          f'POOR_BOSMA22B_IDS = {poor_ids!r}', code, flags=re.S)
             (root / 'configs').mkdir()
             (root / 'configs/rumcnotprostatexnoclinical_folds.json').write_text(json.dumps({'training': training_entries}))
             namespace = {}
@@ -85,7 +92,7 @@ class ClinicalCohortTests(unittest.TestCase):
             dict(patient_id=6, lesion_ISUP='N/A, 0', lesion_GS='bad'),
         ])
         self.assertEqual(audit.loc[audit.selected, 'study_id'].tolist(), [102, 104, 105, 106, 107, 108])
-        self.assertEqual(len(folds['testing']), 2)  # PSAD absent; negative biopsies qualify.
+        self.assertEqual(len(folds['testing_RUMC']), 2)  # PSAD absent; negative biopsies qualify.
         self.assertEqual(len(folds['incomplete_clinicals']), 4)
         self.assertEqual(len(folds['excluded_due_to_duplicate_patient']), 3)
         self.assertEqual(sum(map(len, folds.values())), 10)
@@ -96,7 +103,7 @@ class ClinicalCohortTests(unittest.TestCase):
             dict(patient_id=1),
             dict(patient_id=2),
         ], training_study=0)
-        self.assertEqual(audit.assignment.tolist(), ['training', 'excluded_due_to_training_patient', 'testing'])
+        self.assertEqual(audit.assignment.tolist(), ['training', 'excluded_due_to_training_patient', 'testing_RUMC'])
         self.assertEqual(len(folds['training']), 1)
         self.assertEqual(len(folds['excluded_due_to_boundary_contact']), 0)
         self.assertFalse(audit.loc[audit.patient_id.eq(1), 'selected'].any())
@@ -113,9 +120,25 @@ class ClinicalCohortTests(unittest.TestCase):
         self.assertEqual(audit.boundary_contact_faces.tolist(), ['I', '', 'I', '', 'S'])
         self.assertEqual(audit.assignment.tolist(), [
             'excluded_due_to_boundary_contact', 'incomplete_clinicals',
-            'excluded_due_to_boundary_contact', 'testing', 'excluded_due_to_boundary_contact'])
+            'excluded_due_to_boundary_contact', 'testing_RUMC', 'excluded_due_to_boundary_contact'])
         self.assertTrue(audit.loc[audit.patient_id.eq(2), 'selected_study_id'].isna().all())
         self.assertEqual(len(folds['excluded_due_to_boundary_contact']), 3)
+
+    def test_site_partition_and_poor_segmentation_exclusion(self):
+        audit, folds = self.run_notebook([
+            dict(patient_id=1, center='PCNN'),
+            dict(patient_id=2, center='RUMC'),
+            dict(patient_id=3, center='ZGT'),
+            dict(patient_id=4, center='PCNN', poor_segmentation=True,
+                 contacts=[(2, 0)]),
+            dict(patient_id=4, center='PCNN', mri_date='2021-01-01'),
+        ])
+        self.assertNotIn('testing', folds)
+        self.assertEqual([len(folds[f'testing_{site}']) for site in ('PCNN', 'RUMC', 'ZGT')], [2, 1, 1])
+        self.assertEqual(len(folds['excluded_due_to_poor_bosma22b_segmentation']), 1)
+        self.assertEqual(audit.loc[audit.study_id.eq(103), 'assignment'].item(),
+                         'excluded_due_to_poor_bosma22b_segmentation')
+        self.assertEqual(audit.loc[audit.patient_id.eq(4) & audit.selected, 'study_id'].item(), 104)
 
 
 if __name__ == '__main__':

@@ -75,14 +75,14 @@ class PicaiClinicalAnalysisTests(unittest.TestCase):
             train = [dict(id='picai_999_999', image='unused', label='unused')]
             (configs / 'rumcnotprostatexnoclinical_folds.json').write_text(json.dumps(dict(training=train, testing=[])))
             (configs / 'pooled2_folds.json').write_text(json.dumps(dict(training=[])))
-            (configs / 'picai_test_clinical_folds.json').write_text(json.dumps(dict(training=train, testing=entries)))
+            (configs / 'picai_test_clinical_folds.json').write_text(json.dumps(dict(training=train, testing_PCNN=[], testing_RUMC=entries, testing_ZGT=[])))
             code = SOURCE.replace("REPO_ROOT = Path(__file__).resolve().parents[1] if '__file__' in globals() else Path.cwd().resolve()",
                                   f'REPO_ROOT = Path({str(root)!r})')
-            code = code.replace('EXPECTED_CASES == 880', 'EXPECTED_CASES == 8').replace('N_BOOTSTRAP = 100_000', 'N_BOOTSTRAP = 100')
+            code = code.replace("globals().get('SITE', 'PCNN')", "'RUMC'").replace('N_BOOTSTRAP = 100_000', 'N_BOOTSTRAP = 100')
             namespace = {}
             with contextlib.redirect_stdout(io.StringIO()), patch('matplotlib.figure.Figure.savefig'), patch('matplotlib.pyplot.show', side_effect=lambda: plt.close('all')):
                 exec(compile(code, '<synthetic PI-CAI analysis>', 'exec'), namespace)
-            output = root / 'results/picai_test_clinical_volume'
+            output = root / 'results/picai_test_clinical_volume/RUMC'
             volumes = pd.read_csv(output / 'comparator_volumes.csv')
             self.assertEqual(len(volumes), 8)
             self.assertAlmostEqual(volumes.iloc[0].gt_volume_ml, 64.)
@@ -94,7 +94,7 @@ class PicaiClinicalAnalysisTests(unittest.TestCase):
             self.assertTrue(pd.read_csv(output / 'segmentation_summary.csv').n.eq(8).all())
             metadata = json.loads((output / 'run_metadata.json').read_text())
             self.assertEqual(metadata['cohort_sha256'], hashlib.sha256('\n'.join(sorted(x['id'] for x in entries)).encode()).hexdigest())
-            qi = dict(REPO_ROOT=root, OUTPUT_DIR=output, COHORTS={'picai': ('picai_test_clinical_volume', 'PI-CAI', 'Bosma22b automated surrogate')},
+            qi = dict(SITE='RUMC', TESTING_FOLD='testing_RUMC', REPO_ROOT=root, OUTPUT_DIR=output, COHORTS={'picai': ('picai_test_clinical_volume', 'PI-CAI', 'Bosma22b automated surrogate')},
                       METHODS=['clinical', 'nnunet274'], SCREENS=['both', 'absolute', 'relative', 'either'],
                       PSAD_CUTOFFS=np.array([.10, .15, .20]), PSAD_STRATA=['0–<0.10', '0.10–<0.15', '0.15–<0.20', '≥0.20'],
                       np=np, pd=pd, json=json, hashlib=hashlib, display=lambda *args: None)
@@ -143,6 +143,20 @@ class PicaiClinicalAnalysisTests(unittest.TestCase):
             nib.save(shifted, path)
             with self.assertRaisesRegex(AssertionError, 'Geometry mismatch'):
                 exec(compile(measurement, '<invalid geometry>', 'exec'), dict(namespace))
+
+    def test_optional_figure_is_disabled_and_reports_missing_site_exports(self):
+        optional = QI_SOURCE[QI_SOURCE.index('# %% [markdown]\n# ## Optional six-dataset manuscript figure'):]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            namespace = dict(BUILD_ALL_SITE_FIGURE=False, REPO_ROOT=root)
+            exec(compile(optional, '<disabled manuscript figure>', 'exec'), namespace)
+            self.assertEqual(list(root.iterdir()), [])
+            (root / 'configs').mkdir()
+            (root / 'configs/picai_test_clinical_folds.json').write_text('{}')
+            namespace['BUILD_ALL_SITE_FIGURE'] = True
+            with self.assertRaisesRegex(FileNotFoundError, 'Run quality improvement for all three sites'):
+                exec(compile(optional, '<missing manuscript inputs>', 'exec'), namespace)
+            self.assertFalse((root / 'results/paper_picai_sites').exists())
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@
 # Select one clinically eligible scan per patient using recorded cancer outcome,
 # manual ground truth, then earliest date string, in that order.
 # Reference: prostate_volume_haider/notebooks/analyze_report_volume_coefficients.ipynb.
-# Run cells in order, or: .venv/bin/python notebooks/hlab20260928_clinical_image_listing.py
+# Run cells in order, or: .venv/bin/python notebooks/_hlab20260928_clinical_image_listing.py
 
 # %% Imports and explicit input paths
 from getpass import getpass

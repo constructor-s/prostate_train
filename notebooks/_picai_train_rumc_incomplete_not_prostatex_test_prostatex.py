@@ -69,7 +69,7 @@ assert images['ID'].notna().all() and images['ID'].is_unique, 'Missing or duplic
 #
 # Require finite positive volume (mL) and PSA (ng/mL), finite nonnegative recorded
 # PSAD (ng/mL²), PI-RADS in 1–5, and biopsy grade. Calculated PSA / volume does not
-# replace missing PSAD. Biopsy criteria match picai_clinical_volume.py: `Bx`
+# replace missing PSAD. Biopsy tokens are validated as follows: `Bx`
 # histopathology, case ISUP in 0–5, and usable lesion ISUP or Gleason results.
 # Negative biopsies qualify; prostatectomy-only histology does not.
 # Ignore empty and N/A lesion tokens; all remaining tokens must be valid.

@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 
 
-NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks/_picai_rumc_incomplete_not_prostatex.py'
+NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks/_picai_train_rumc_incomplete_not_prostatex_test_prostatex.py'
 SOURCE = NOTEBOOK.read_text()
 SELECTION_SOURCE = SOURCE[
     SOURCE.index('audit = rumc.copy()'):
-    SOURCE.index('# %% [markdown]\n# ## Add manual PROSTATEx testing')
+    SOURCE.index('# %% [markdown]\n# ## Add manual PROSTATEx testing cases and check mapped identities')
 ]
 TESTING_SOURCE = SOURCE[
     SOURCE.index("testing = prostatex.sort_values('ID').copy()"):

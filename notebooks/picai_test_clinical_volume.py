@@ -13,6 +13,15 @@
 # requires separate approval and is never launched by this notebook. Afterwards
 # rerun this notebook, then `volume_disagreement_quality_improvement.py`.
 
+# %% [markdown]
+# Select one institution; all estimates and outputs below use this site only.
+# Run independently for PCNN, RUMC, and ZGT. Existing pooled exports are historical.
+
+# %%
+SITE = globals().get('SITE', 'PCNN')
+assert SITE in ('PCNN', 'RUMC', 'ZGT'), SITE
+TESTING_FOLD = f'testing_{SITE}'
+
 # %%
 import json
 from itertools import combinations
@@ -45,7 +54,7 @@ MARKSHEET_PATH = PICAI_ROOT / 'clinical_information/marksheet.csv'
 TESTING_MANIFEST_PATH = REPO_ROOT / 'configs/picai_test_clinical_folds.json'
 TRAINING_MANIFEST_PATH = REPO_ROOT / 'configs/rumcnotprostatexnoclinical_folds.json'
 STUDY_ROOT = REPO_ROOT / 'results/20261105_tile0.8_nomirroring'
-OUTPUT_DIR = REPO_ROOT / 'results/picai_test_clinical_volume'
+OUTPUT_DIR = REPO_ROOT / 'results/picai_test_clinical_volume' / SITE
 REFERENCE_NAME = 'Bosma22b automated surrogate'
 PSAD_REPORTING_TOLERANCE = 0.01
 QC_NUMERICAL_TOLERANCE = 1e-12
@@ -60,8 +69,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # %%
 manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
-testing_rows = [entry for centre in ('PCNN', 'RUMC', 'ZGT')
-                for entry in manifest[f'testing_{centre}']]
+testing_rows = manifest[TESTING_FOLD]
 testing_ids = [entry['id'] for entry in testing_rows]
 assert testing_ids and len(testing_ids) == len(set(testing_ids))
 marksheet = pd.read_csv(MARKSHEET_PATH)
@@ -70,6 +78,7 @@ marksheet['ID'] = 'picai_' + marksheet.patient_id.astype(str) + '_' + marksheet.
 assert set(testing_ids) <= set(marksheet.ID)
 linked = marksheet.set_index('ID', drop=False).loc[testing_ids].copy().reset_index(drop=True)
 assert linked.patient_id.is_unique
+assert linked.center.eq(SITE).all()
 EXPECTED_CASES = len(testing_ids)
 entries = pd.DataFrame(testing_rows).rename(columns={'id': 'ID', 'label': 'label_wg', 'image': 't2'})
 linked = linked.merge(entries, on='ID', validate='one_to_one')
@@ -139,7 +148,7 @@ for key, (model_root, dataset_name) in MODEL_ROOTS.items():
         reason = 'verified' if verified else 'incompatible_or_incomplete_provenance'
         prediction_provenance[key] = dict(config=config, config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest())
     argv = ['.venv/bin/python', str((bundle / 'scripts/infer.py').relative_to(REPO_ROOT)),
-            '--input', str(TESTING_MANIFEST_PATH.relative_to(REPO_ROOT)), '--split', 'testing',
+            '--input', str(TESTING_MANIFEST_PATH.relative_to(REPO_ROOT)), '--split', TESTING_FOLD,
             '--data_root', 'data/raw', '--output_folder', str(model_root.relative_to(REPO_ROOT)),
             '--tile_step_size', '0.8', '--no-use_mirroring', '--device', 'cuda', '--no-overwrite']
     prediction_audit.append(dict(model=key, expected=EXPECTED_CASES, missing=len(missing),
@@ -1819,8 +1828,8 @@ else:
 # `N/A` entries; do not assign a numeric score when none is available. Scores mix
 # PI-RADS v1/2/2.1 according to the guidelines used at examination. Fall back to
 # the entire eligible linked cohort only when the column is absent, never when
-# the selected subgroup is empty. Current local data yield 23 eligible cases:
-# 5 with `case_ISUP >= 2` (csPCa) and 18 with `case_ISUP <= 1`.
+# the selected subgroup is empty. Eligible and outcome counts are calculated
+# below independently for the selected site.
 #
 # Simulate recommending biopsy at **unrounded PSA density >= 0.15 ng/mL²**;
 # equality recommends biopsy. Evaluate surrogate-mask density and every selected
@@ -1998,6 +2007,7 @@ mapping = json.loads((PICAI_ROOT / 'additional_resources/ProstateX-mapping.json'
 px_testing = {entry['id'] for entry in training_manifest['testing']}
 prostatex_ids = {int(value.split('_')[0]) for key, value in mapping.items() if key.split('_')[0] in px_testing}
 metadata = dict(
+    site=SITE, fold=TESTING_FOLD,
     n_patients=len(volumes), reference=REFERENCE_NAME,
     cohort_sha256=hashlib.sha256('\n'.join(sorted(testing_ids)).encode()).hexdigest(),
     input_sha256={str(path.relative_to(REPO_ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -2046,8 +2056,7 @@ analysis_metadata_path.write_text(json.dumps(analysis_metadata, indent=2, allow_
 # %%
 segmentation_volumes = pd.read_csv(OUTPUT_DIR / 'comparator_volumes.csv')
 segmentation_manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
-segmentation_ids = [entry['id'] for centre in ('PCNN', 'RUMC', 'ZGT')
-                    for entry in segmentation_manifest[f'testing_{centre}']]
+segmentation_ids = [entry['id'] for entry in segmentation_manifest[TESTING_FOLD]]
 assert segmentation_volumes.ID.is_unique and segmentation_volumes.patient_id.is_unique
 assert set(segmentation_volumes.ID) == set(segmentation_ids)
 segmentation_models = [key for key in SELECTED_COMPARATORS if key != 'clinical']
@@ -2096,7 +2105,7 @@ segmentation_summary = segmentation_cases.groupby(['method', 'name'], sort=False
 assert segmentation_summary.n.eq(len(segmentation_ids)).all()
 segmentation_cases.to_csv(OUTPUT_DIR / 'segmentation_metrics_per_case.csv', index=False)
 segmentation_summary.to_csv(OUTPUT_DIR / 'segmentation_summary.csv', index=False)
-segmentation_metadata = dict(n_patients=len(segmentation_ids), reference='Bosma22b automated surrogate',
+segmentation_metadata = dict(site=SITE, fold=TESTING_FOLD, n_patients=len(segmentation_ids), reference='Bosma22b automated surrogate',
     cohort_sha256=hashlib.sha256('\n'.join(sorted(segmentation_ids)).encode()).hexdigest(),
     manifest_sha256=hashlib.sha256(TESTING_MANIFEST_PATH.read_bytes()).hexdigest(),
     source_notebook_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest() if '__file__' in globals() else None,

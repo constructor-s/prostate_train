@@ -20,6 +20,15 @@
 # not be pooled as independent observations. Local review tables print outlier
 # case identifiers, available image paths, and method volumes for inspection.
 
+# %% [markdown]
+# Select one institution; all estimates and outputs below use this site only.
+# Run independently for PCNN, RUMC, and ZGT. Existing pooled exports are historical.
+
+# %%
+SITE = globals().get('SITE', 'PCNN')
+assert SITE in ('PCNN', 'RUMC', 'ZGT'), SITE
+TESTING_FOLD = f'testing_{SITE}'
+
 # %%
 import ast
 import hashlib
@@ -39,7 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1] if '__file__' in globals() else 
 if REPO_ROOT.name == 'notebooks':
     REPO_ROOT = REPO_ROOT.parent
 assert (REPO_ROOT / 'pyproject.toml').is_file(), 'Establish the repository root'
-OUTPUT_DIR = REPO_ROOT / 'results/volume_disagreement_quality_improvement'
+OUTPUT_DIR = REPO_ROOT / 'results/volume_disagreement_quality_improvement' / SITE
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 COHORTS = {
     'prostatex': ('prostatex_linked_volume', 'ProstateX', 'Manual whole-gland segmentation'),
@@ -73,6 +82,9 @@ cohorts = {}
 provenance = []
 for cohort_key, (directory, label, reference_name) in COHORTS.items():
     root = REPO_ROOT / 'results' / directory
+    if cohort_key == 'picai':
+        root = root / SITE
+        label = f'PI-CAI {SITE}'
     tables = {}
     input_hashes = {}
     for table_name in ['comparator_volumes', 'psa_density_per_case',
@@ -97,7 +109,8 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
         manifest_path = REPO_ROOT / ('configs/picai_test_clinical_folds.json' if cohort_key == 'picai'
                                      else 'configs/rumcnotprostatexnoclinical_folds.json')
         manifest = json.loads(manifest_path.read_text())
-        testing_ids = [row['id'] for row in manifest['testing']]
+        testing_folds = (TESTING_FOLD,) if cohort_key == 'picai' else ('testing',)
+        testing_ids = [row['id'] for fold in testing_folds for row in manifest[fold]]
         excluded_folds = {name: [row['id'] for row in rows] for name, rows in manifest.items()
                           if name == 'excluded' or name.startswith('excluded_')}
         excluded_ids = [case_id for ids in excluded_folds.values() for case_id in ids]
@@ -115,6 +128,7 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
             assert hashlib.sha256(manual_record_path.read_bytes()).hexdigest() == manual_postprocessing['sha256'], 'Stale postprocessing provenance'
         input_hashes[str(source_metadata_path.relative_to(REPO_ROOT))] = hashlib.sha256(source_metadata_path.read_bytes()).hexdigest()
         if cohort_key == 'picai':
+            assert volume.center.eq(SITE).all()
             reserved_patients = {int(row['id'].split('_')[1]) for row in manifest['training']}
             assert not set(volume.patient_id) & reserved_patients, 'Training-patient leakage'
             metadata_path = root / 'run_metadata.json'
@@ -226,7 +240,10 @@ flags = pd.concat(flag_tables, ignore_index=True)
 flags.to_csv(OUTPUT_DIR / 'case_audit.csv', index=False)
 thresholds.to_csv(OUTPUT_DIR / 'disagreement_thresholds.csv', index=False)
 for flag_cohort in ['prostatex', 'picai']:
-    plot_flag_path = REPO_ROOT / 'results' / COHORTS[flag_cohort][0] / 'manual_automated_disagreement_flags.csv'
+    plot_root = REPO_ROOT / 'results' / COHORTS[flag_cohort][0]
+    if flag_cohort == 'picai':
+        plot_root = plot_root / SITE
+    plot_flag_path = plot_root / 'manual_automated_disagreement_flags.csv'
     if not plot_flag_path.is_file():
         raise FileNotFoundError('Run the corresponding source notebook through its agreement-figure cell first')
     plot_flags = pd.read_csv(plot_flag_path, float_precision='round_trip').set_index('ID')
@@ -697,7 +714,7 @@ for cohort_key, volume in cohorts.items():
         assert eligibility.excluded_unknown_outcome + eligibility.n_known_outcomes == eligibility.n_reference_decisions
         for outcome in biopsy_summary.loc[biopsy_summary.cohort.eq(cohort_key) & biopsy_summary.screen.eq(screen)].itertuples():
             assert outcome.tp + outcome.fn + outcome.fp + outcome.tn == outcome.n
-metadata = dict(cohorts=provenance, primary_screen='both', secondary_screens=SCREENS[1:],
+metadata = dict(site=SITE, fold=TESTING_FOLD, cohorts=provenance, primary_screen='both', secondary_screens=SCREENS[1:],
                 disagreement_sign='manual minus nnUNet274', relative_denominator='pair mean',
                 loa='mean +/- 1.96 sample SD; strict outside; full cohort',
                 n_bootstrap=N_BOOTSTRAP, ci_seed=RANDOM_SEED, test_seed=RANDOM_SEED + 1,

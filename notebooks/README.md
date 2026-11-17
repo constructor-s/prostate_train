@@ -739,7 +739,9 @@ then place all other exams from those patients in
 
 For remaining patients, clinical completeness requires finite positive volume
 and PSA, valid PI-RADS, and biopsy results; recorded PSAD is optional. Exclude
-any superior/inferior Bosma22b mask-face contact first, then prefer complete
+the six manually reviewed poor Bosma22b segmentations into
+`excluded_due_to_poor_bosma22b_segmentation`, then exclude any superior/inferior
+Bosma22b mask-face contact. Among remaining visits, prefer complete
 clinicals, earliest MRI date, and original marksheet row order. Other noncontact
 visits enter the duplicate fold. Contact is an operational exclusion, not proof
 of anatomical truncation. All 1,500 image/reference pairs are checked for paths,
@@ -751,14 +753,19 @@ Validated local partition (1,500 exams / 1,476 patients):
 |---|---:|---:|
 | `training` | 236 | 236 |
 | `excluded_due_to_training_patient` | 3 | 3 |
-| `testing` | 880 | 880 |
+| `testing_PCNN` | 315 | 315 |
+| `testing_RUMC` | 391 | 391 |
+| `testing_ZGT` | 168 | 168 |
 | `incomplete_clinicals` | 247 | 247 |
 | `excluded_due_to_boundary_contact` | 115 | 115 |
 | `excluded_due_to_duplicate_patient` | 19 | 18 |
+| `excluded_due_to_poor_bosma22b_segmentation` | 6 | 6 |
+| **Total exams** | **1,500** | |
 
 Training patients do not occur in testing or incomplete clinicals. Exclusion-fold
-patient counts can overlap selected-fold patient counts. The 880 testing patients
-comprise 316 PCNN, 396 RUMC, and 168 ZGT patients. Neither model's PI-CAI training
+patient counts can overlap selected-fold patient counts. The 874 testing patients
+are partitioned by marksheet `center` into PCNN, RUMC, and ZGT folds; there is no
+combined `testing` key. Review and analysis readers combine these three folds. Neither model's PI-CAI training
 patient IDs overlap testing in the current manifests.
 
 Run `.venv/bin/python notebooks/picai_test_clinical_volume.py` next. It compares
@@ -800,3 +807,27 @@ control per centre. Outputs are under `results/picai_rumc_error_review/`.
 The review records native-grid connected components and reference coverage;
 Bosma22b remains an automated surrogate. The 300-mm field-of-view grouping is
 post hoc and descriptive. No predictions or primary cohort results are modified.
+
+
+### Independent PI-CAI site analyses
+
+The current analysis workflow uses one institution at a time, with no pooled
+PI-CAI estimates. Set the `SITE` parameter cell to `PCNN` (default), `RUMC`, or
+`ZGT`, then execute cells in order. These select `testing_PCNN` (315 patients),
+`testing_RUMC` (391), or `testing_ZGT` (168). Together they contain 874 distinct
+patients. Results go to `results/<analysis_name>/<SITE>/`; existing files directly
+under the analysis directory are historical pooled outputs and are not inputs.
+
+For each site, execute:
+
+1. `picai_test_clinical_volume.py`, including the supplementary segmentation cells.
+2. `picai_rumc_error_review.py`, then `picai_rumc_rmse_drivers.py`.
+3. `volume_disagreement_quality_improvement.py`, then `picai_disagreement_worsened_review.py`.
+
+The quality-improvement notebook retains the other datasets' analyses and uses
+only the selected site's PI-CAI inputs. Its thresholds and flags are recalculated
+within that site. Existing 100,000-resample settings and seeds are preserved;
+statistical correction families are applied separately within each run. Empty
+review subsets yield empty tables rather than historical fixed case counts.
+Site outputs record membership and input provenance. Required local predictions
+must pass existing provenance checks; these notebooks do not launch inference.

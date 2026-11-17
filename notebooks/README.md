@@ -728,3 +728,75 @@ sum to 204 and preserve normal `id`, `image`, and manual `label` paths. The sepa
 ProstateX total. Boundary contact is an operational rule, not proof of truncation.
 Review and manually copy the candidate to the active manifest before refreshing
 downstream analyses; generation does not modify the active manifest or results.
+
+## PI-CAI clinical cohort split and volume analysis
+
+Run `.venv/bin/python notebooks/_picai_test_clinical.py` to generate
+`configs/picai_test_clinical_folds.json` and audits under
+`results/picai_test_clinical/`. Reserve Dataset236's training entries exactly,
+then place all other exams from those patients in
+`excluded_due_to_training_patient`. No retraining is performed.
+
+For remaining patients, clinical completeness requires finite positive volume
+and PSA, valid PI-RADS, and biopsy results; recorded PSAD is optional. Exclude
+any superior/inferior Bosma22b mask-face contact first, then prefer complete
+clinicals, earliest MRI date, and original marksheet row order. Other noncontact
+visits enter the duplicate fold. Contact is an operational exclusion, not proof
+of anatomical truncation. All 1,500 image/reference pairs are checked for paths,
+binary foreground, millimetre units, and geometry before export.
+
+Validated local partition (1,500 exams / 1,476 patients):
+
+| Fold | Exams | Patients |
+|---|---:|---:|
+| `training` | 236 | 236 |
+| `excluded_due_to_training_patient` | 3 | 3 |
+| `testing` | 880 | 880 |
+| `incomplete_clinicals` | 247 | 247 |
+| `excluded_due_to_boundary_contact` | 115 | 115 |
+| `excluded_due_to_duplicate_patient` | 19 | 18 |
+
+Training patients do not occur in testing or incomplete clinicals. Exclusion-fold
+patient counts can overlap selected-fold patient counts. The 880 testing patients
+comprise 316 PCNN, 396 RUMC, and 168 ZGT patients. Neither model's PI-CAI training
+patient IDs overlap testing in the current manifests.
+
+Run `.venv/bin/python notebooks/picai_test_clinical_volume.py` next. It compares
+clinical ellipsoid, Multicenter Dataset274, and RUMC Dataset236 with **Bosma22b
+automated surrogate** whole-gland label-1 references, measuring native-grid volumes
+in mL. Outputs go to `results/picai_test_clinical_volume/`. The full suite includes
+volume and PSA-density agreement, paired inference, PSAD strata, PI-RADS 3 biopsy
+simulation, reported-PSAD consistency review, figures, and reproducibility metadata.
+Review flags never change cohort membership. The supplementary whole-gland DSC
+cells export `segmentation_metrics_per_case.csv`, `segmentation_summary.csv`, and
+`segmentation_run_metadata.json`, retaining zero-overlap failures. Those cells
+can run against existing comparator-volume exports without repeating inference
+or the statistical cells. Statistics retain 100,000 resamples
+and seeds 20261102/20261103. These are surrogate-agreement analyses.
+
+The prediction preflight verifies model metadata, five folds, tile step 0.8,
+Gaussian weighting, disabled mirroring, and the final checkpoint. Expected folders
+are `results/20261105_tile0.8_nomirroring/<model>/picai_test_clinical/`, using
+manifest IDs including the `picai_` prefix. Missing or unverified predictions stop
+execution and produce `prediction_availability.csv` and `inference_commands.txt`.
+The notebook never launches inference; review commands and approve execution
+separately. Commands preserve existing outputs with `--no-overwrite`; incompatible
+existing provenance requires review before reuse. Historical predictions without
+matching inference provenance are not accepted automatically.
+
+After predictions are available, rerun the clinical notebook, then
+`notebooks/volume_disagreement_quality_improvement.py`. PI-CAI is its fourth cohort,
+with manifest and input-hash checks, source-flag reconciliation, all existing
+screens and analyses, and a four-panel paired-error figure. PI-CAI and ProstateX
+can share patients; overlap is reported and cohorts must not be pooled as
+independent observations. `paper.md` is unchanged.
+
+## PI-CAI RUMC error review
+
+Run `.venv/bin/python notebooks/picai_rumc_error_review.py` after the clinical
+analysis to rank Dataset236 errors, summarize centre and image-grid patterns,
+and generate multiplanar overlays for the eight worst cases plus one low-error
+control per centre. Outputs are under `results/picai_rumc_error_review/`.
+The review records native-grid connected components and reference coverage;
+Bosma22b remains an automated surrogate. The 300-mm field-of-view grouping is
+post hoc and descriptive. No predictions or primary cohort results are modified.

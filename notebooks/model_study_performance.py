@@ -752,3 +752,26 @@ for name, title, table in [
 per_case.to_csv(TABLE_DIR / 'per_case_metrics.csv', index=False, na_rep='NA')
 cohort_audit.to_csv(TABLE_DIR / 'cohort_audit.csv', index=False, na_rep='NA')
 print(f'Tables and audit: {TABLE_DIR.relative_to(REPO_ROOT)}')
+
+# %% [markdown]
+# ## Saved-mask postprocessing provenance
+#
+# Original inference settings describe model execution. Record any subsequent
+# manually imposed Dataset236 mask processing separately, without implying it
+# was selected during cross-validation.
+
+# %%
+import hashlib
+manual_record_path = REPO_ROOT / 'results/20261105_tile0.8_nomirroring/Dataset236_raw_3d_fullres_5fold/manual_postprocessing.json'
+manual_postprocessing = None
+if manual_record_path.is_file():
+    manual_record = json.loads(manual_record_path.read_text())
+    assert manual_record['status'] == 'complete', 'Incomplete Dataset236 postprocessing'
+    manual_postprocessing = dict(path=str(manual_record_path.relative_to(REPO_ROOT)),
+                                 sha256=hashlib.sha256(manual_record_path.read_bytes()).hexdigest(),
+                                 record=manual_record)
+analysis_metadata_path = TABLE_DIR / 'run_metadata.json'
+analysis_metadata = json.loads(analysis_metadata_path.read_text()) if analysis_metadata_path.is_file() else {}
+analysis_metadata['manual_postprocessing'] = manual_postprocessing
+analysis_metadata['source_notebook_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest() if '__file__' in globals() else None
+analysis_metadata_path.write_text(json.dumps(analysis_metadata, indent=2, allow_nan=False) + '\n')

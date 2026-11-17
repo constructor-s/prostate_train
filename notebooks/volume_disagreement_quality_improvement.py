@@ -4,10 +4,11 @@
 # Can unusually discordant manual ellipsoid and nnUNet274 volumes identify
 # patients who may benefit from measurement review? Screen without reference
 # volumes, then evaluate paired accuracy against manual references (ProstateX
-# and Toronto) or an automated surrogate (expanded Toronto). A flag does not
+# and Toronto) or automated surrogates (expanded Toronto and PI-CAI). A flag does not
 # establish which measurement is wrong or identify an error's cause.
 #
-# Read existing local exports; run prostatex_linked_clinical_volume.py first
+# Read existing local exports; run picai_test_clinical_volume.py and
+# prostatex_linked_clinical_volume.py first
 # after changing the reviewed testing manifest, then run these cells in order.
 # The manifest separates superior/inferior mask-boundary exclusions from
 # mapping/clinical ineligibility; those cases remain in upstream audits but
@@ -44,6 +45,7 @@ COHORTS = {
     'prostatex': ('prostatex_linked_volume', 'ProstateX', 'Manual whole-gland segmentation'),
     'toronto_manual': ('toronto_jdmi_clinical_volume', 'Toronto manual', 'Median manual-reader planimetry'),
     'toronto_surrogate': ('toronto_jdmi_4111_clinical_volume', 'Toronto surrogate', 'nnUNet702 automated surrogate'),
+    'picai': ('picai_test_clinical_volume', 'PI-CAI', 'Bosma22b automated surrogate'),
 }
 METHODS = ['clinical', 'nnunet274']
 SCREENS = ['both', 'absolute', 'relative', 'either']
@@ -91,8 +93,9 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
     excluded_ids = []
     excluded_folds = {}
     membership_hash = hashlib.sha256('\n'.join(sorted(volume.index)).encode()).hexdigest()
-    if cohort_key == 'prostatex':
-        manifest_path = REPO_ROOT / 'configs/rumcnotprostatexnoclinical_folds.json'
+    if cohort_key in ('prostatex', 'picai'):
+        manifest_path = REPO_ROOT / ('configs/picai_test_clinical_folds.json' if cohort_key == 'picai'
+                                     else 'configs/rumcnotprostatexnoclinical_folds.json')
         manifest = json.loads(manifest_path.read_text())
         testing_ids = [row['id'] for row in manifest['testing']]
         excluded_folds = {name: [row['id'] for row in rows] for name, rows in manifest.items()
@@ -102,9 +105,24 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
         assert testing_ids and len(testing_ids) == len(set(testing_ids)), 'Empty or duplicate testing IDs'
         assert not set(testing_ids) & set(excluded_ids), 'Testing/excluded manifest overlap'
         assert set(volume.index) == set(testing_ids), (
-            'ProstateX exports differ from the reviewed testing fold; rerun '
-            'prostatex_linked_clinical_volume.py before this notebook')
+            f'{cohort_key} exports differ from the reviewed testing fold; rerun its source notebook')
         assert volume.patient_id.is_unique
+        source_metadata_path = root / 'run_metadata.json'
+        source_metadata = json.loads(source_metadata_path.read_text())
+        manual_postprocessing = source_metadata.get('manual_postprocessing')
+        if manual_postprocessing is not None:
+            manual_record_path = REPO_ROOT / manual_postprocessing['path']
+            assert hashlib.sha256(manual_record_path.read_bytes()).hexdigest() == manual_postprocessing['sha256'], 'Stale postprocessing provenance'
+        input_hashes[str(source_metadata_path.relative_to(REPO_ROOT))] = hashlib.sha256(source_metadata_path.read_bytes()).hexdigest()
+        if cohort_key == 'picai':
+            reserved_patients = {int(row['id'].split('_')[1]) for row in manifest['training']}
+            assert not set(volume.patient_id) & reserved_patients, 'Training-patient leakage'
+            metadata_path = root / 'run_metadata.json'
+            metadata = json.loads(metadata_path.read_text())
+            assert metadata['cohort_sha256'] == membership_hash and metadata['n_patients'] == len(volume)
+            for relative_path, digest in metadata['input_sha256'].items():
+                assert hashlib.sha256((REPO_ROOT / relative_path).read_bytes()).hexdigest() == digest, 'Stale PI-CAI inputs'
+            input_hashes[str(metadata_path.relative_to(REPO_ROOT))] = hashlib.sha256(metadata_path.read_bytes()).hexdigest()
         input_hashes[str(manifest_path.relative_to(REPO_ROOT))] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     else:
         metadata_path = root / 'run_metadata.json'
@@ -123,7 +141,7 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
         input_hashes[str(source_path.relative_to(REPO_ROOT))] = hashlib.sha256(source_path.read_bytes()).hexdigest()
     # Preserve the source's selected PSA, including Toronto report/alternative
     # consolidation and documented correction; raw `psa` is not equivalent.
-    psa_column = 'psa_numeric_ng_ml' if cohort_key == 'prostatex' else 'psa_consolidated'
+    psa_column = 'psa_numeric_ng_ml' if cohort_key in ('prostatex', 'picai') else 'psa_consolidated'
     volume['psa'] = pd.to_numeric(audit[psa_column], errors='coerce')
     for method in ['gt', *METHODS]:
         volume[f'{method}_psad'] = volume.psa / volume[f'{method}_volume_ml'].where(volume[f'{method}_volume_ml'].gt(0))
@@ -141,7 +159,7 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
         recomputed_categories = np.searchsorted(PSAD_CUTOFFS, volume.loc[saved_psad.index, f'{method}_psad'], side='right')
         assert np.array_equal(recomputed_categories, saved_categories), 'Recomputed PSAD crosses a saved category boundary'
     volume['pirads_3'] = audit.biopsy_pirads_status.isin(['maximum_pirads_3', 'pirads_3'])
-    if cohort_key == 'prostatex':
+    if cohort_key in ('prostatex', 'picai'):
         volume['outcome_known'] = audit.biopsy_outcome_status.eq('valid_case_isup')
         volume['cancer_positive'] = audit.case_isup_numeric.ge(2)
     else:
@@ -156,10 +174,14 @@ for cohort_key, (directory, label, reference_name) in COHORTS.items():
     cohorts[cohort_key] = volume
     provenance.append(dict(cohort=cohort_key, name=label, n=len(volume), reference=reference_name,
                            cohort_sha256=membership_hash, input_sha256=input_hashes,
-                           excluded_ids=excluded_ids, excluded_folds=excluded_folds))
+                           excluded_ids=excluded_ids, excluded_folds=excluded_folds,
+                           manual_postprocessing=source_metadata.get('manual_postprocessing')
+                           if cohort_key in ('prostatex', 'picai') else None))
 
 assert set(cohorts['toronto_manual'].index) <= set(cohorts['toronto_surrogate'].index)
 print('Toronto manual-reference patients are included in expanded Toronto; analyses are not independent.')
+shared_picai_prostatex = set(cohorts['picai'].patient_id) & set(cohorts['prostatex'].patient_id)
+print(f'PI-CAI and ProstateX share {len(shared_picai_prostatex)} patients; do not pool cohorts.')
 display(pd.DataFrame(provenance)[['cohort', 'n', 'reference']])
 
 # %% [markdown]
@@ -203,25 +225,27 @@ thresholds = pd.DataFrame(threshold_rows)
 flags = pd.concat(flag_tables, ignore_index=True)
 flags.to_csv(OUTPUT_DIR / 'case_audit.csv', index=False)
 thresholds.to_csv(OUTPUT_DIR / 'disagreement_thresholds.csv', index=False)
-plot_flag_path = REPO_ROOT / 'results/prostatex_linked_volume/manual_automated_disagreement_flags.csv'
-if not plot_flag_path.is_file():
-    raise FileNotFoundError('Run the ProstateX source notebook through its agreement-figure cell first')
-plot_flags = pd.read_csv(plot_flag_path, float_precision='round_trip').set_index('ID')
-px = cohorts['prostatex']
-assert set(plot_flags.index) == set(px.index)
-for source_column, analysis_column in [('outside_ml', 'flag_absolute'), ('outside_percent', 'flag_relative'),
-                                        ('outside_both', 'flag_both'), ('outside_either', 'flag_either')]:
-    assert np.array_equal(plot_flags.loc[px.index, source_column], px[analysis_column]), 'Figure/analysis flags differ'
-for column in ['disagreement_ml', 'disagreement_percent']:
-    assert np.allclose(plot_flags.loc[px.index, column], px[column], rtol=0, atol=1e-10)
-provenance[0]['input_sha256'][str(plot_flag_path.relative_to(REPO_ROOT))] = hashlib.sha256(plot_flag_path.read_bytes()).hexdigest()
+for flag_cohort in ['prostatex', 'picai']:
+    plot_flag_path = REPO_ROOT / 'results' / COHORTS[flag_cohort][0] / 'manual_automated_disagreement_flags.csv'
+    if not plot_flag_path.is_file():
+        raise FileNotFoundError('Run the corresponding source notebook through its agreement-figure cell first')
+    plot_flags = pd.read_csv(plot_flag_path, float_precision='round_trip').set_index('ID')
+    px = cohorts[flag_cohort]
+    assert set(plot_flags.index) == set(px.index)
+    for source_column, analysis_column in [('outside_ml', 'flag_absolute'), ('outside_percent', 'flag_relative'),
+                                            ('outside_both', 'flag_both'), ('outside_either', 'flag_either')]:
+        assert np.array_equal(plot_flags.loc[px.index, source_column], px[analysis_column]), 'Figure/analysis flags differ'
+    for column in ['disagreement_ml', 'disagreement_percent']:
+        assert np.allclose(plot_flags.loc[px.index, column], px[column], rtol=0, atol=1e-10)
+    flag_provenance = next(row for row in provenance if row['cohort'] == flag_cohort)
+    flag_provenance['input_sha256'][str(plot_flag_path.relative_to(REPO_ROOT))] = hashlib.sha256(plot_flag_path.read_bytes()).hexdigest()
 display(thresholds)
 
 # %% [markdown]
 # ## Volume accuracy and review burden
 #
-# Evaluate against manual references in the first two cohorts and nnUNet702 in
-# the expanded cohort. All percentage errors use the positive reference volume,
+# Evaluate against manual references in ProstateX/Toronto, nnUNet702 in
+# expanded Toronto, and Bosma22b in PI-CAI. All percentage errors use the positive reference volume,
 # not the pair mean used for screening. Positive paired reduction favors nnUNet274.
 # A patient's winner is identical on absolute and percentage error scales.
 # Improvement among all flagged cases and closer probability among non-ties
@@ -231,7 +255,7 @@ display(thresholds)
 # method volumes available in each source export, even though the accuracy
 # comparison below is restricted to clinical ellipsoid and nnUNet274. All volumes
 # are in mL; `gt_volume_ml` is the cohort's reference, which is an automated
-# surrogate in expanded Toronto. Image paths are retained as saved upstream.
+# surrogate in expanded Toronto and PI-CAI. Image paths are retained as saved upstream.
 
 # %%
 outlier_case_tables = []
@@ -616,14 +640,14 @@ display(biopsy_summary.loc[biopsy_summary.screen.eq('both')])
 #
 # Connect signed errors before/after using automated measurement, not observed
 # corrections to clinical reports. Green indicates lower absolute reference
-# error; orange indicates worsening. The expanded panel measures surrogate
+# error; orange indicates worsening. Expanded Toronto and PI-CAI measure surrogate
 # agreement. Small downstream groups cannot establish improved cancer detection
 # or a deployed mitigation workflow. Selecting by disagreement is compatible
 # with either method failing; prospective calibration and adjudication remain
 # necessary to establish error causes and routine-care performance.
 
 # %%
-fig, axes = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
+fig, axes = plt.subplots(1, len(COHORTS), figsize=(4 * len(COHORTS), 4), constrained_layout=True)
 for ax, (cohort_key, (_, label, _)) in zip(axes, COHORTS.items()):
     selected = cohorts[cohort_key].loc[cohorts[cohort_key].flag_both]
     for row in selected.itertuples():
@@ -680,6 +704,7 @@ metadata = dict(cohorts=provenance, primary_screen='both', secondary_screens=SCR
                 bootstrap_batch=BOOTSTRAP_BATCH, confidence_level=CONFIDENCE_LEVEL,
                 inference_conditions='fixed thresholds, fixed selected patients, fixed predictions',
                 toronto_manual_subset_of_expanded=True,
+                picai_prostatex_shared_patients=len(shared_picai_prostatex),
                 source_notebook_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest() if '__file__' in globals() else None)
 (OUTPUT_DIR / 'run_metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
 print('Reconciled figure flags, input cohorts, category cutoffs, paired counts, and biopsy denominators.')

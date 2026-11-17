@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PI-CAI mask review</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #141414; color: #eee; font: 14px system-ui; }
+  header, footer { padding: 8px 14px; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  button, select, input { font: inherit; margin-right: 8px; padding: 4px; }
+  #note { width: 30vw; }
+  #status { color: #ffd17a; }
+  #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; }
+  .panel { position: relative; height: calc((100vh - 155px) / 3); min-height: 120px; background: black; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .label { position: absolute; top: 3px; left: 6px; pointer-events: none; background: #0009; }
+</style>
+<header>
+  <h1 id="title">PI-CAI mask review</h1>
+  <button id="prev">← Previous</button><button id="next">Next →</button>
+  <form id="jump" style="display: inline">
+    <label>Case ID <input id="case-id" type="text" placeholder="Enter case ID" required></label>
+    <button id="go" type="submit">Go</button>
+  </form>
+  <label>Bosma22b <select id="rating">
+    <option value="unreviewed">Unreviewed</option><option value="acceptable">Acceptable</option>
+    <option value="incorrect">Incorrect</option><option value="unsure">Unsure</option>
+  </select></label>
+  <label>Note <input id="note" type="text"></label><span id="status" role="status"></span>
+</header>
+<main id="grid"></main>
+<footer>← / → cases · Wheel: slice under pointer · Click: position cursor · Native acquisition planes (may be oblique)</footer>
+<script>
+const $ = id => document.getElementById(id);
+const axes = [2, 0, 1], planes = ['Axial', 'Sagittal', 'Coronal'];
+const models = ['Bosma22b', 'Multicenter Dataset274', 'RUMC Dataset236'];
+const colors = ['#00d5ff', '#50e070', '#ff9d30'];
+let index = 0, total = 0, info = null, cursor = [], images = [], busy = false;
+let displayedCursor = [];
+let version = 0, timer = null, rendering = false, renderPending = false, dirty = false, finished = false;
+const canvases = [];
+let requestId = 0;
+function debug(text) {
+  const line = `${new Date().toISOString()} ${text}`;
+  console.log('[PI-CAI]', line);
+}
+window.addEventListener('error', event => {
+  debug(`JS ERROR ${event.message} at ${event.filename}:${event.lineno}`);
+  message(`JavaScript error: ${event.message}; see browser console`);
+});
+window.addEventListener('unhandledrejection', event => {
+  debug(`UNHANDLED PROMISE ${event.reason?.stack || event.reason}`);
+  message('Browser error; see browser console');
+});
+
+async function api(url, options = {}) {
+  const id = ++requestId, started = performance.now(), timeout = new AbortController();
+  let expired = false;
+  const clock = setTimeout(() => { expired = true; timeout.abort(); }, 30000);
+  debug(`#${id} START ${options.method || 'GET'} ${url}`);
+  try {
+    const response = await fetch(url, {...options, signal: timeout.signal});
+    debug(`#${id} HTTP ${response.status} after ${Math.round(performance.now()-started)}ms`);
+    const data = await response.json();
+    if (!response.ok) throw Error(data.error || response.statusText);
+    debug(`#${id} JSON ready after ${Math.round(performance.now()-started)}ms`);
+    return data;
+  } catch (error) {
+    debug(`#${id} ${expired ? 'TIMEOUT (30s)' : error.name} ${error.message}`);
+    if (expired) throw Error('Request timed out after 30 seconds; check server logs / SSH forwarding');
+    throw error;
+  } finally {
+    clearTimeout(clock);
+  }
+}
+function message(text) { $('status').textContent = text; }
+function buttons() {
+  $('prev').disabled = busy || index === 0;
+  $('next').disabled = busy || finished;
+  $('case-id').disabled = $('go').disabled = busy;
+  $('next').textContent = index === total - 1 ? 'Finish ✓' : 'Next →';
+  $('rating').disabled = $('note').disabled = busy || !info;
+}
+function geometry(canvas, row) {
+  const other = [0, 1, 2].filter(a => a !== axes[row]);
+  const [u, v] = other, width = info.shape[u], height = info.shape[v];
+  const scale = Math.min(canvas.width / (width * info.spacing[u]), canvas.height / (height * info.spacing[v]));
+  const w = width * info.spacing[u] * scale, h = height * info.spacing[v] * scale;
+  return {u, v, width, height, w, h, x: (canvas.width-w)/2, y: (canvas.height-h)/2};
+}
+function draw() {
+  canvases.forEach((canvas, i) => {
+    const ratio = devicePixelRatio || 1;
+    canvas.width = Math.round(canvas.clientWidth * ratio);
+    canvas.height = Math.round(canvas.clientHeight * ratio);
+    const ctx = canvas.getContext('2d');
+    if (!info?.shape || !images[i]) return;
+    const row = Math.floor(i/3), g = geometry(canvas, row);
+    ctx.drawImage(images[i], g.x, g.y, g.w, g.h);
+    const x = g.x + (displayedCursor[g.u]+.5)/g.width*g.w;
+    const y = g.y + (g.height-displayedCursor[g.v]-.5)/g.height*g.h;
+    ctx.strokeStyle = '#ffffff80'; ctx.lineWidth = ratio;
+    ctx.beginPath(); ctx.moveTo(x, g.y); ctx.lineTo(x, g.y+g.h);
+    ctx.moveTo(g.x, y); ctx.lineTo(g.x+g.w, y); ctx.stroke();
+    ctx.fillStyle = 'white'; ctx.font = `${12*ratio}px system-ui`;
+    // RAS voxel axes; neurological display. Direction labels are approximate for oblique scans.
+    const labels = row === 0 ? ['L', 'R', 'A', 'P'] : row === 1 ? ['P', 'A', 'S', 'I'] : ['L', 'R', 'S', 'I'];
+    ctx.textAlign = 'left'; ctx.fillText(labels[0], g.x+3*ratio, g.y+g.h/2);
+    ctx.textAlign = 'right'; ctx.fillText(labels[1], g.x+g.w-3*ratio, g.y+g.h/2);
+    ctx.textAlign = 'center'; ctx.fillText(labels[2], g.x+g.w/2, g.y+14*ratio);
+    ctx.fillText(labels[3], g.x+g.w/2, g.y+g.h-4*ratio);
+    ctx.textAlign = 'right'; ctx.fillText(`${displayedCursor[axes[row]]+1}/${info.shape[axes[row]]}`, canvas.width-6*ratio, canvas.height-6*ratio);
+  });
+}
+function refresh() {
+  ++version;
+  renderPending = true;
+  debug(`Refresh ${version}: case=${index} xyz=${cursor.join(',')}; inFlight=${rendering}`);
+  clearTimeout(timer);
+  timer = setTimeout(renderLatest, 40);
+}
+async function renderLatest() {
+  if (rendering || busy || !info?.shape) return;
+  rendering = true;
+  renderPending = false;
+  const token = version;
+  const nextCursor = [...cursor];
+  try {
+    message('Loading…');
+    const urls = info.panels.map((url, panel) =>
+      url.replace(/\/\d+\.png$/, `/${nextCursor[axes[Math.floor(panel/3)]]}.png`));
+    debug(`Refresh ${token}: decoding ${urls.length} PNGs`);
+    const nextImages = await decodePanels(urls);
+    if (token !== version) return;
+    images = nextImages; displayedCursor = nextCursor;
+    draw();
+    message('Saved when navigating; Finish on last case.');
+    debug(`Refresh ${token}: drawn`);
+  } catch (error) {
+    if (token === version) {
+      cursor = [...displayedCursor];
+      message(`Image error: ${error.message}`);
+    }
+  } finally {
+    rendering = false;
+    if (renderPending && !busy && info?.shape) {
+      clearTimeout(timer); timer = setTimeout(renderLatest, 0);
+    }
+  }
+}
+function decodePanels(panels) {
+  return Promise.all(panels.map(src => new Promise((resolve, reject) => {
+    const image = new Image();
+    const clock = setTimeout(() => { image.src = ''; reject(Error(`Image request timed out: ${src}`)); }, 30000);
+    image.onload = () => {
+      clearTimeout(clock);
+      resolve(image);
+    };
+    image.onerror = () => { clearTimeout(clock); reject(Error(`PNG loading failed: ${src}`)); };
+    image.src = src;
+  })));
+}
+async function navigate(target, initial = false, targetId = null) {
+  debug(`Navigate ${index} → ${target}; busy=${busy}`);
+  if (busy || (!initial && (target < 0 || target > total))) return;
+  busy = true; buttons();
+  message('Loading…');
+  ++version; clearTimeout(timer); renderPending = false;
+  cursor = [...displayedCursor];
+  try {
+    const previous = initial || !info ? null : {index, rating: $('rating').value, note: $('note').value};
+    const nextInfo = await api('/api/navigate', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(targetId === null ? {target, previous} : {target_id: targetId, previous})});
+    if (nextInfo.finished) { dirty = false; finished = true; message('Saved. Review finished.'); return; }
+    if (nextInfo.error) throw Error(nextInfo.error);
+    debug('Navigation: decoding starting PNGs');
+    const nextImages = await decodePanels(nextInfo.panels);
+    index = nextInfo.index; total = nextInfo.total; info = nextInfo; images = nextImages;
+    cursor = info.cursor ? [...info.cursor] : [];
+    displayedCursor = [...cursor];
+    draw(); debug(`Navigation: metadata ready for case ${index}`);
+    dirty = true; finished = false; // Current case is recorded only when leaving it.
+    $('title').textContent = `PI-CAI | ${info.center} | ${info.ID} | ${index+1} / ${total}`;
+    window.history.replaceState(null, '', `/case/${index+1}`);
+    $('rating').value = info.rating; $('note').value = info.note;
+    $('case-id').value = info.ID;
+    message('Saved when navigating; Finish on last case.');
+  } catch (error) { message(`Could not save/load: ${error.message}. Retry using navigation.`); }
+  finally { busy = false; buttons(); debug(`Navigation finished; case=${index}, busy=false`); }
+}
+for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+  const panel = document.createElement('div'); panel.className = 'panel';
+  const label = document.createElement('span'); label.className = 'label';
+  label.textContent = `${planes[row]} · ${models[col]}`; label.style.color = colors[col];
+  const canvas = document.createElement('canvas'); canvases.push(canvas);
+  panel.append(canvas, label); $('grid').append(panel);
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    debug(`Wheel ${planes[row]} delta=${event.deltaY}; busy=${busy}, loaded=${!!info?.shape}`);
+    if (busy || !info?.shape) return;
+    const axis = axes[row];
+    const next = Math.max(0, Math.min(info.shape[axis]-1, cursor[axis] + Math.sign(event.deltaY)));
+    if (next === cursor[axis]) return;
+    cursor[axis] = next;
+    refresh();
+  }, {passive: false});
+  canvas.addEventListener('click', event => {
+    debug(`Click ${planes[row]}; busy=${busy}, loaded=${!!info?.shape}`);
+    if (busy || !info?.shape) return;
+    const g = geometry(canvas, row), rect = canvas.getBoundingClientRect();
+    const x = (event.clientX-rect.left)*canvas.width/rect.width;
+    const y = (event.clientY-rect.top)*canvas.height/rect.height;
+    if (x < g.x || x >= g.x+g.w || y < g.y || y >= g.y+g.h) { debug('Click outside image'); return; }
+    cursor[g.u] = Math.floor((x-g.x)/g.w*g.width);
+    cursor[g.v] = g.height-1-Math.floor((y-g.y)/g.h*g.height);
+    refresh();
+  });
+}
+$('prev').onclick = () => navigate(index-1);
+$('next').onclick = () => navigate(index+1);
+$('jump').onsubmit = event => {
+  event.preventDefault();
+  const caseId = $('case-id').value.trim();
+  if (caseId) navigate(null, false, caseId);
+};
+$('rating').onchange = $('note').oninput = () => { dirty = true; finished = false; buttons(); };
+document.addEventListener('keydown', event => {
+  if (event.target.closest('input, textarea, select, button, [contenteditable]') || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault(); if (!event.repeat) navigate(index + (event.key === 'ArrowRight' ? 1 : -1));
+  }
+});
+window.addEventListener('resize', draw);
+window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+buttons();
+const match = window.location.pathname.match(/^\/case\/(\d+)$/);
+navigate(match ? Number(match[1])-1 : null, true);
+</script>
+</html>

@@ -60,7 +60,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # %%
 manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
-testing_rows = manifest['testing']
+testing_rows = [entry for centre in ('PCNN', 'RUMC', 'ZGT')
+                for entry in manifest[f'testing_{centre}']]
 testing_ids = [entry['id'] for entry in testing_rows]
 assert testing_ids and len(testing_ids) == len(set(testing_ids))
 marksheet = pd.read_csv(MARKSHEET_PATH)
@@ -70,7 +71,6 @@ assert set(testing_ids) <= set(marksheet.ID)
 linked = marksheet.set_index('ID', drop=False).loc[testing_ids].copy().reset_index(drop=True)
 assert linked.patient_id.is_unique
 EXPECTED_CASES = len(testing_ids)
-assert EXPECTED_CASES == 880, 'Reviewed cohort changed; inspect upstream manifest'
 entries = pd.DataFrame(testing_rows).rename(columns={'id': 'ID', 'label': 'label_wg', 'image': 't2'})
 linked = linked.merge(entries, on='ID', validate='one_to_one')
 linked['clinical_volume_ml'] = pd.to_numeric(linked.prostate_volume, errors='coerce')
@@ -2046,7 +2046,8 @@ analysis_metadata_path.write_text(json.dumps(analysis_metadata, indent=2, allow_
 # %%
 segmentation_volumes = pd.read_csv(OUTPUT_DIR / 'comparator_volumes.csv')
 segmentation_manifest = json.loads(TESTING_MANIFEST_PATH.read_text())
-segmentation_ids = [entry['id'] for entry in segmentation_manifest['testing']]
+segmentation_ids = [entry['id'] for centre in ('PCNN', 'RUMC', 'ZGT')
+                    for entry in segmentation_manifest[f'testing_{centre}']]
 assert segmentation_volumes.ID.is_unique and segmentation_volumes.patient_id.is_unique
 assert set(segmentation_volumes.ID) == set(segmentation_ids)
 segmentation_models = [key for key in SELECTED_COMPARATORS if key != 'clinical']

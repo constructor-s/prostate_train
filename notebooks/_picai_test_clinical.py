@@ -9,7 +9,8 @@
 # Negative biopsies qualify; empty/N/A tokens are ignored.
 #
 # Preserve Dataset236 training exactly and reserve all its patients first.
-# For other patients, first exclude any mask contacting a superior/inferior outer face (>0 voxels).
+# For other patients, exclude the six manually identified poor Bosma22b segmentations
+# in a separate fold, then any mask contacting a superior/inferior outer face (>0 voxels).
 # This operational rule suggests possible incomplete coverage, not proven truncation.
 # Among remaining visits prefer complete clinicals, earliest MRI date, then CSV
 # row order. Other visits enter the duplicate fold. Patients with only contacting
@@ -38,6 +39,10 @@ BOSMA_ROOT = PICAI_ROOT / 'picai_labels/anatomical_delineations/whole_gland/AI/B
 MANIFEST_PATH = REPO_ROOT / 'configs/picai_test_clinical_folds.json'
 OUTPUT_DIR = REPO_ROOT / 'results/picai_test_clinical'
 TRAINING_MANIFEST_PATH = REPO_ROOT / 'configs/rumcnotprostatexnoclinical_folds.json'
+POOR_BOSMA22B_IDS = {
+    '11050_1001070', '10096_1000096', '10211_1000215',
+    '10355_1000361', '10473_1000481', '10730_1000746',
+}
 training_entries = json.loads(TRAINING_MANIFEST_PATH.read_text())['training']
 training_ids = {entry['id'].removeprefix('picai_') for entry in training_entries}
 training_patients = {int(case.split('_')[0]) for case in training_ids}
@@ -152,7 +157,11 @@ audit['has_boundary_contact'] = audit['boundary_contact_faces'].ne('')
 assert training_ids <= set(audit['ID']), 'Training exam absent from marksheet'
 audit['in_training'] = audit['ID'].isin(training_ids)
 audit['training_patient'] = audit['patient_id'].isin(training_patients)
-ranked = audit.loc[~audit['training_patient'] & ~audit['has_boundary_contact']].sort_values(
+assert POOR_BOSMA22B_IDS <= set(audit['ID']), 'Poor-segmentation exam absent from marksheet'
+assert POOR_BOSMA22B_IDS.isdisjoint(training_ids), 'Cannot exclude fixed training exams'
+audit['poor_bosma22b_segmentation'] = audit['ID'].isin(POOR_BOSMA22B_IDS)
+eligible = ~audit['training_patient'] & ~audit['poor_bosma22b_segmentation'] & ~audit['has_boundary_contact']
+ranked = audit.loc[eligible].sort_values(
     ['patient_id', 'complete_study_information', 'visit_date', 'marksheet_row'],
     ascending=[True, False, True, True],
 )
@@ -160,22 +169,28 @@ selected = ranked.drop_duplicates('patient_id')
 audit['selected'] = audit['ID'].isin(selected['ID'])
 audit['selected_study_id'] = audit['patient_id'].map(selected.set_index('patient_id')['study_id']).astype('Int64')
 audit['assignment'] = np.select(
-    [audit['in_training'], audit['training_patient'], audit['has_boundary_contact'],
+    [audit['in_training'], audit['training_patient'], audit['poor_bosma22b_segmentation'], audit['has_boundary_contact'],
      ~audit['selected'], audit['complete_study_information']],
-    ['training', 'excluded_due_to_training_patient', 'excluded_due_to_boundary_contact',
+    ['training', 'excluded_due_to_training_patient', 'excluded_due_to_poor_bosma22b_segmentation', 'excluded_due_to_boundary_contact',
      'excluded_due_to_duplicate_patient', 'testing'],
     default='incomplete_clinicals',
 )
 audit['selection_reason'] = np.select(
-    [audit['in_training'], audit['training_patient'], audit['has_boundary_contact'],
+    [audit['in_training'], audit['training_patient'], audit['poor_bosma22b_segmentation'], audit['has_boundary_contact'],
      ~audit['selected'], audit['complete_study_information']],
     ['fixed_dataset236_training_exam', 'other_exam_of_dataset236_training_patient',
+     'manual_review_poor_bosma22b_segmentation',
      'bosma22b_superior_or_inferior_boundary_contact', 'lower_ranked_noncontact_visit',
      'selected_earliest_complete_noncontact_visit'],
     default='selected_earliest_incomplete_noncontact_visit',
 )
-fold_names = ['training', 'excluded_due_to_training_patient', 'testing', 'incomplete_clinicals', 'excluded_due_to_boundary_contact',
-              'excluded_due_to_duplicate_patient']
+testing_centres = ('PCNN', 'RUMC', 'ZGT')
+testing = audit['assignment'].eq('testing')
+assert audit.loc[testing, 'center'].isin(testing_centres).all(), 'Unknown testing institution'
+audit.loc[testing, 'assignment'] = 'testing_' + audit.loc[testing, 'center']
+fold_names = ['training', 'excluded_due_to_training_patient',
+              *[f'testing_{centre}' for centre in testing_centres], 'incomplete_clinicals', 'excluded_due_to_boundary_contact',
+              'excluded_due_to_duplicate_patient', 'excluded_due_to_poor_bosma22b_segmentation']
 folds = {}
 for name in fold_names:
     frame = audit.loc[audit['assignment'].eq(name)].sort_values(['patient_id', 'visit_date', 'marksheet_row'])
@@ -186,10 +201,11 @@ folds['training'] = training_entries  # Preserve original entry order as well as
 assert folds['training'] == training_entries
 assert not set(audit.loc[audit['selected'], 'patient_id']) & training_patients
 assert audit.loc[audit['selected'], 'patient_id'].is_unique
-assert audit['selected'].sum() == audit.loc[~audit.training_patient & ~audit.has_boundary_contact, 'patient_id'].nunique()
-assert set(audit.loc[audit.assignment.eq('testing'), 'patient_id']).isdisjoint(
+assert audit['selected'].sum() == audit.loc[eligible, 'patient_id'].nunique()
+assert {entry['id'].removeprefix('picai_') for entry in folds['excluded_due_to_poor_bosma22b_segmentation']} == POOR_BOSMA22B_IDS
+assert set(audit.loc[audit.assignment.isin([f'testing_{centre}' for centre in testing_centres]), 'patient_id']).isdisjoint(
     audit.loc[audit.assignment.eq('incomplete_clinicals'), 'patient_id'])
-assert audit.loc[audit.assignment.eq('testing'), 'complete_study_information'].all()
+assert audit.loc[audit.assignment.isin([f'testing_{centre}' for centre in testing_centres]), 'complete_study_information'].all()
 assert not audit.loc[audit.assignment.eq('incomplete_clinicals'), 'complete_study_information'].any()
 for field in ('id', 'image', 'label'):
     values = [entry[field] for entries in folds.values() for entry in entries]
@@ -198,10 +214,8 @@ for field in ('id', 'image', 'label'):
 # %% [markdown]
 # ## Review computed cohort counts and export
 #
-# Current local inputs: 1,500 exams / 1,476 patients. The partition contains
-# 236 fixed training exams, 3 other training-patient exams, 880 testing,
-# 247 incomplete-clinical, 115 boundary-contact, and 19 duplicate exams. These descriptive counts are
-# recomputed below from validated inputs, overall and by centre.
+# Cohort counts are recomputed below from validated inputs, overall and by centre,
+# including testing_PCNN, testing_RUMC, testing_ZGT and poor-segmentation exclusions.
 # Exclusion-fold patient counts can overlap selected-fold patient counts.
 # All validation completes before creating outputs.
 

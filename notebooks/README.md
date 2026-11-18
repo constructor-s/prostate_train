@@ -23,6 +23,7 @@ as an incidental step when analyzing existing models.
 
 | Notebook | Required upstream inputs and purpose | Output directory |
 | --- | --- | --- |
+| [paper_new_results.py](paper_new_results.py) | Completed performance, clinical, segmentation, and three site-specific disagreement exports; derive disjoint clinical cohorts, assemble eight testing cohorts, six-cohort closeness tests, a 12-panel Bland–Altman figure, and every PI-RADS 3 intersection outlier for `paper_new.md`. | `results/paper_new_results/` and marked manuscript tables |
 | [model_study_performance.py](model_study_performance.py) | Model configurations, manifests, exported bundles, and saved predictions; evaluate segmentation and volume error by dataset/split. It can offer inference commands for explicit execution. | `results/20261105_tile0.8_nomirroring/tables/` |
 | [prostatex_linked_clinical_volume.py](prostatex_linked_clinical_volume.py) | Active RUMC/PROSTATEx manifest, marksheet linkage, manual reference masks, and study predictions; volume, PSAD, biopsy, and agreement analyses. | `results/prostatex_linked_volume/` |
 | [picai_test_clinical_volume.py](picai_test_clinical_volume.py) | Reviewed PI-CAI manifest, clinical marksheet, Bosma22b references, and verified study predictions; analyze one institution's volume, PSAD, biopsy, and whole-gland DSC results. | `results/picai_test_clinical_volume/<SITE>/` |
@@ -122,3 +123,70 @@ metadata records the code and inputs used for those original runs.
 
 Keep new analyses as readable `.py` cell notebooks and resolve inputs from the
 repository root. Leave [notebooks_legacy](../notebooks_legacy/) unchanged.
+
+## Revised manuscript synthesis
+
+After the upstream clinical analyses and all three site-specific disagreement
+runs are complete, execute:
+
+```bash
+.venv/bin/python notebooks/paper_new_results.py
+```
+
+This notebook reads saved measurements and segmentation metrics, reconciles
+repeated ProstateX/Toronto exports, and generates Tables 1–6 in `paper_new.md`.
+Only marked table blocks are updated; surrounding prose is preserved. Set
+`UPDATE_MANUSCRIPT = False` in the parameter cell to generate outputs alone.
+All generated CSV/Markdown tables, case audits, and hashed provenance go to
+`results/paper_new_results/`. Case identifiers and recorded outcomes are private
+local audit material; manuscript Table 6 contains those identifiers.
+
+The synthesis validates the archived expanded Toronto parent cohort of
+4,105 patients, then subtracts the 383 manual-reference patients to obtain
+Toronto JDMI Additional (3,722 patients). It also removes 116 ProstateX patients
+from PI-CAI RUMC, retaining 275 patients. Both subtractions use patient identifiers.
+Selected/removed membership audits and parent/subset hashes are exported, and all
+six clinical analysis cohorts are checked for patient-level disjointness. The current exclusion file would select 4,109 with six additions
+and two removals. The notebook verifies and exports this known discrepancy and
+the archived exclusions; parent configs and source exports remain unchanged. It stops on
+unreviewed input changes. The 383-patient manual cohort has unchanged membership.
+Volume and ordinal PSAD closeness use two-sided exact binomial tests among
+non-ties, with separate six-cohort Holm families. These differ from the older
+quality-improvement notebook's statistical correction families.
+
+The synthesis uses the exact fixed ProstateX RUMC criteria for every disjoint
+cohort: −14.28 to +25.74 mL and −22.70 to +39.60%, with strict exceedance of
+both intervals. Cohort-specific means and LoA remain descriptive figure values.
+Volume, PSAD, and biopsy summaries all use this common intersection selection. `bland_altman_clinical_nnunet274.png` (300 dpi), `.pdf`, and
+`bland_altman_summary.csv` contain the 6×2 absolute/relative agreement figure and its values.
+`BA_XLIM`, `BA_YLIM`, and `BA_REL_YLIM` default to `None`, showing all points.
+Set increasing tuples for the common x-axis (mL), absolute y-axis (mL), and
+relative y-axis (%), respectively, then rerun the dedicated plotting cell.
+Each dataset occupies one row: absolute differences left, relative differences
+right, using 100 × difference / pair mean. Y-limits are shared within columns.
+The compact 8.5 × 9.75 inch portrait export uses constrained layout with no
+reserved caption area and x-axis tick labels on every panel. Black points have
+alpha 0.15; dataset means are gray solid lines and dataset LoA are gray dotted
+lines. Black dashed lines overlay the exact fixed ProstateX criteria
+(−14.28 to +25.74 mL; −22.70 to +39.60%). These define both analytical selection and figure highlighting. Nonzero hidden counts
+are annotated; zero counts are omitted. The summary CSV and provenance record
+the common plot criteria.
+The summary CSV has 12 rows keyed by cohort and scale, with explicit units. Every panel reports points outside either
+axis range once; cropping never removes observations from statistics. The sign
+is clinical ellipsoid minus nnUNet274. Table 4 now reports common-criteria
+volume accuracy, Table 5 PSAD closeness, and Table 6 all selected PI-RADS 3 cases. Plot-only reruns update
+the figure and summary; rerun the final provenance cell to refresh run metadata.
+
+All Bland–Altman x-axes use a logarithmic display with labeled major ticks at
+10, 30, 100, and 300 mL on every panel; minor tick labels are suppressed.
+`BA_XLIM` remains in mL and requires strictly positive bounds. Pair means and
+differences used in all calculations remain in their original units.
+
+In both plot columns, cases strictly outside both common intervals are orange
+(`#D55E00`, alpha 1.0, size 4), drawn above the black points (alpha 0.15, size 4).
+The legend and `common_both_n` in the plot summary report the full-cohort count,
+independent of display cropping. This highlighting exactly matches analytical intersection membership.
+Prior derived outputs are archived in `before_common_criteria/`; parent exports
+and configs remain unchanged. Tables 1–3 are unaffected. The volume ties column
+is shown only if a nonzero exact tie count occurs; PSAD equal-distance counts
+are always retained.

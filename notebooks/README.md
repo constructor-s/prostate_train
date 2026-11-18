@@ -124,6 +124,27 @@ metadata records the code and inputs used for those original runs.
 Keep new analyses as readable `.py` cell notebooks and resolve inputs from the
 repository root. Leave [notebooks_legacy](../notebooks_legacy/) unchanged.
 
+## Refreshing Toronto measurements after mask postprocessing
+
+Both Toronto volume notebooks accept an optional `EXCLUDE_JSON` global pointing
+to an archived exclusion JSON. The default remains the shared current exclusion
+file. Keep the previous cohort hash and expected count when refreshing masks;
+a changed count or membership stops the analysis.
+
+For an unchanged clinical workbook and listing, `WORKBOOK_AUDIT_PATH` may point
+to a previous run's `workbook_key_audit.csv`, stored alongside its
+`run_metadata.json`. This avoids decrypting the workbook again. The notebooks
+verify the workbook and listing hashes against that prior run, restore the raw
+workbook identifiers, and recompute clinical parsing and all measurements.
+The audit source, exclusions, and model postprocessing records are included in
+new provenance. Archive outputs before rerunning and retain the archived inputs
+referenced by the new metadata.
+
+After both Toronto notebooks finish, refresh all three site-specific
+`volume_disagreement_quality_improvement.py` runs before the manuscript
+synthesis. To retain manuscript edits, run the synthesis with
+`UPDATE_MANUSCRIPT=False` and transfer affected values selectively.
+
 ## Revised manuscript synthesis
 
 After the upstream clinical analyses and all three site-specific disagreement

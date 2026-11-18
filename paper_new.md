@@ -1,10 +1,58 @@
+# Methods
+
+## Study datasets and reference standards
+
+We compared automated prostate whole-gland segmentation and volumetry with clinical ellipsoid volume estimates and cohort-specific reference measurements. Eight testing cohorts were evaluated: Multicenter Data testing examinations acquired with an external coil (22 examinations), Multicenter Data endorectal-coil examinations (13 examinations), ProstateX RUMC (157 patients), Toronto JDMI (383 patients), PI-CAI RUMC excluding ProstateX RUMC (275 patients), Toronto JDMI Additional (3,722 patients), PI-CAI ZGT (168 patients), and PI-CAI PCNN with wide-field imaging (315 patients). The original 35-examination Multicenter Data test set was separated into external-coil and endorectal-coil subgroups after review of segmentation failures; this was an exploratory, post hoc subgroup analysis.
+
+Manual whole-gland masks supplied the reference for the Multicenter Data and ProstateX cohorts. Toronto JDMI used the median of manual-reader planimetry volumes; spatial reference masks were unavailable for its segmentation evaluation. PI-CAI used Bosma22b automated whole-gland masks, and Toronto JDMI Additional used an internal nnU-Net model, with whole gland defined as the union of labels 1, 2, and 3. Comparisons with these automated surrogate references assess agreement with their labeling methods rather than accuracy against independent manual truth. Clinical ellipsoid volumes were taken from the saved clinical measurements, including reported volumes for Toronto JDMI.
+
+The ProstateX cohort required a unique PI-CAI examination linkage, a finite positive clinical volume, and a manual whole-gland mask. Of 190 otherwise eligible examinations, 33 were excluded because the manual mask contacted a superior or inferior outer image face. PI-CAI testing excluded single-center training patients and their repeat examinations, six manually reviewed poor Bosma22b masks, and examinations with superior or inferior reference-mask boundary contact. Among eligible visits, clinically complete examinations were preferred, followed by the earliest MRI date, with original marksheet order resolving ties. Clinical completeness for PI-CAI testing required finite positive volume and PSA, valid lesion PI-RADS scores, and biopsy results; recorded PSAD was optional. Boundary contact was an operational selection criterion and did not establish anatomical truncation.
+
+For the six clinical comparison cohorts, each patient contributed one examination and cohort membership was made disjoint. The PI-CAI RUMC cohort retained 275 of 391 patients after removing 116 represented in ProstateX RUMC, using PI-CAI patient identifiers. Toronto JDMI Additional retained 3,722 of an archived 4,105-patient cohort after removing the 383 Toronto JDMI manual-reference patients by medical record identifier. The archived Toronto measurements and accession exclusions were preserved rather than substituting the current exclusion file, whose membership differs. Patient identifiers were compared within the Dutch and Toronto identifier systems. The 236 single-center training patients had no patient-ID overlap with either evaluated PI-CAI RUMC or ZGT cohort.
+
+## Model development
+
+The multicenter model was trained on 239 T2-weighted MRI examinations: 119 from Prostate158, 67 from PROMISE12, 27 from Prostate Diagnosis, and 26 from QIN Prostate Repeatability. These are examination counts rather than asserted counts of unique patients. The single-center model was trained on 236 examinations from 236 RUMC patients in PI-CAI. Patients with any clinically complete RUMC examination or any ProstateX mapping were excluded, and the earliest examination was selected for each remaining patient. Training-selection completeness required finite positive volume and PSA, finite nonnegative recorded PSAD, valid PI-RADS scores, and biopsy results on the same examination. Single-center training masks were Bosma22b automated whole-gland annotations. Their shared provenance with the PI-CAI evaluation references was considered when interpreting performance.
+
+Both models used nnU-Net's three-dimensional full-resolution residual-encoder U-Net with one T2-weighted input channel and whole-gland segmentation as the target. Model-specific plans used z-score intensity normalization and resampling to approximately 3.00 × 0.402 × 0.402 mm for the multicenter model and 3.00 × 0.300 × 0.300 mm for the single-center model, in the plans' array-axis order. Patch sizes in the same order were 28 × 384 × 384 and 16 × 512 × 512 voxels, respectively; both used a batch size of two. The multicenter and single-center networks had seven and eight resolution stages, respectively, with instance normalization and leaky rectified linear unit activations.
+
+Five folds were trained for each model, with 100 epochs per fold, 250 training iterations and 50 validation iterations per epoch. Saved trainer records specify stochastic gradient descent with initial learning rate 0.01, Nesterov momentum 0.99, weight decay 3 × 10⁻⁵, and polynomial learning-rate decay. Training used combined soft Dice and cross-entropy loss with deep supervision. The installed nnU-Net training implementation includes rotation, scaling, mirroring, Gaussian noise and blur, brightness and contrast changes, gamma transformations, and simulated low-resolution augmentation. Saved training records report PyTorch 2.12.0+cu130. The environment inspected for this analysis contains nnU-Net 2.7.0 and dynamic-network-architectures 0.4.4; these installed versions are not independently timestamped records of the original training environment.
+
+## Inference and segmentation processing
+
+Predictions were generated using the exported models' inference entrypoints and ensembles of folds 0–4. Recorded inference settings used a sliding-window tile step of 0.8 and disabled mirroring at inference. Whole-gland foreground was label 1 for both evaluated models. Largest-connected-component filtering for the multicenter model was selected during cross-validation. Filtering was not selected during single-center cross-validation; following review of failures, the same operation was imposed post hoc on its saved Multicenter Data, ProstateX, PI-CAI, and Toronto predictions. Original predictions and processing audits were retained.
+
+Spatial overlap was evaluated only after checking mask geometry and millimetre units; PI-CAI mask comparisons required matching grids with maximum voxel-corner displacement no greater than 0.5 mm. Segmentation-derived volume was calculated as foreground voxel count multiplied by voxel volume in mm³ and divided by 1,000 to obtain mL. Spatial comparison used masks in the same geometry. Scalar Toronto reference volumes were used only for volume comparisons.
+
+## Segmentation and volume evaluation
+
+Each examination was weighted equally within its cohort. Whole-gland overlap was measured using the Dice similarity coefficient, DSC = 2|P ∩ R|/(|P| + |R|), where P and R denote predicted and reference foreground masks. Segmentation failures, including zero-overlap cases, remained in the evaluated cohort. DSC was not calculated for Toronto cohorts with scalar reference volumes.
+
+For measured volume V and positive reference volume R, volume errors were summarized as mean absolute error, MAE = mean(|V − R|), and root mean squared error, RMSE = √mean[(V − R)²], in mL. Percentage errors were MAPE = 100 × mean(|V − R|/R) and RMSPE = 100 × √mean[((V − R)/R)²]. Higher DSC and lower volume errors indicate better agreement with the reference. Manual-reference agreement plots used signed differences V − R and relative differences 100 × (V − R)/R. Descriptive 95% limits of agreement were the mean signed difference ±1.96 sample standard deviations; these limits are not confidence intervals.
+
+## Disagreement screening and downstream analyses
+
+Following comparison of both models, subsequent disagreement analyses used the multicenter model as a representative automated approach because of its broader generalization across the evaluated imaging settings. The analysis examined whether an automated measurement available to a radiologist could identify discordant ellipsoid estimates and potentially support volume assessment and downstream decisions; no reader intervention or deployed correction workflow was tested.
+
+Screening used clinical ellipsoid volume M and automated volume A without consulting each patient's reference volume. Signed disagreement was D = M − A in mL, and relative disagreement was Q = 100 × (M − A)/[(M + A)/2] in percent. The pair-mean denominator differs from the reference-volume denominator used for percentage errors. ProstateX RUMC supplied the calibration distribution, from which mean ±1.96 sample standard deviations gave fixed, rounded limits of −14.28 to +25.74 mL and −22.70 to +39.60%. A case was selected only if strictly outside both intervals, irrespective of tail; equality at a boundary was retained. The rounded intervals were applied unchanged to all six clinical cohorts, without local recentering. Cohort-specific limits were descriptive. These empirically calibrated criteria were exploratory review thresholds, not established clinical tolerances, and ProstateX was not an independent validation of their transportability.
+
+Within selected cases, automated and ellipsoid measurements were compared by absolute reference-volume error and by MAE, RMSE, MAPE, and RMSPE. Automated wins, losses, and ties indicated smaller, larger, or exactly equal absolute error relative to ellipsoid measurements. PSAD was calculated using the same patient-level PSA for each volume method, as PSA in ng/mL divided by volume in mL, yielding ng/mL². Finite positive PSA and finite PSAD for all three methods were required for category comparisons. Unrounded PSAD values were assigned to categories <0.10, 0.10–<0.15, 0.15–<0.20, and ≥0.20 ng/mL², assigning cutoff equality to the higher category. Closeness was absolute ordinal distance from the reference-volume-derived category. Equal distance could include different categories equally far from the reference; closer categories were not necessarily identical to the reference category.
+
+Among selected cases with maximum recorded PI-RADS 3, biopsy recommendations were simulated using unrounded PSAD ≥0.15 ng/mL² for the reference, ellipsoid, and automated volumes. Changes from ellipsoid to automated recommendations were classified as moving into or away from agreement with the reference recommendation. Recorded outcome-positive status was ISUP grade group ≥2 for PI-CAI and CSCANCER Y for Toronto; these outcome definitions were retained separately. Unknown outcomes were retained for recommendation-agreement comparisons but excluded from outcome-based metrics. Sensitivity was the proportion of outcome-positive cases recommended for biopsy, and specificity the proportion of outcome-negative cases assigned to biopsy avoidance. Overall biopsy avoidance included both true negatives and false negatives. Outcome analyses were descriptive because positive cases were sparse and outcomes were missing for some patients.
+
+## Statistical analysis and reproducibility
+
+Two-sided exact binomial tests compared the proportion of automated wins among non-ties with 50%, separately for absolute volume error and PSAD category distance. Ties were retained in descriptive denominators but excluded from the tests. Tables 4 and 5 report Holm-adjusted p-values across six cohorts, with separate correction families for volume and PSAD comparisons. Undefined tests were assigned p = 1 for correction and retained as undefined in reporting. Pooled comparisons summed wins and losses first across the two manual-reference cohorts and then across all six clinical cohorts; their p-values were unadjusted. These pooled comparisons assume independent patients and may be dominated by the larger cohorts. Predictions, calibration thresholds, and selected cases were treated as fixed; tests did not incorporate model-training variability or uncertainty from threshold estimation and case selection.
+
+The analysis was assembled from saved measurements and segmentation evaluations using [the synthesis notebook](notebooks/paper_new_results.py). Membership audits, patient exclusions, reference provenance, input SHA-256 hashes, and numerical outputs were retained under results/paper_new_results/. The synthesis checked cohort membership and reproduced calculations without new model training, inference, or mask processing. This retrospective analysis of recorded measurements and simulated recommendations does not establish prospective effects on radiologist performance, cancer detection, or clinical management.
+
 # Results
 
 ## Segmentation performance and volume accuracy
 
 Eight testing cohorts were evaluated using the multicenter model, the single-center model trained only on RUMC data, and clinical manual ellipsoid estimates (Tables 1–3). Whole-gland volume errors were calculated relative to manual expert whole-gland segmentations where available (Testing fold of Multicenter Data, ProstateX, and Toronto JDMI), and a surrogate high-quality automated reference trained within the same institutions otherwise (Bosma22b for PI-CAI and internal nnU-Net model output for Toronto JDMI). Note that the endorectal coil data and wide-field PI-CAI PCNN data were particularly challenging as the former was not represented in the single-center model and the latter was not encountered in either model's training data, so they serve as a stress test of model generalization.
 
-On the Multicenter Data testing fold, mean whole-gland DSC was 0.905 for the multicenter model and 0.904 for the single-center model. On ProstateX RUMC, the corresponding values were 0.906 and 0.916, respectively. The single-center model, having never seen external-coil or wide-field images, performed poorly in those cohorts (DSC 0.593 and 0.558, respectively). The multicenter model was able to generalize better to the wide-field PCNN data that it also did not encounter in training, achieving DSC 0.882. Upon inspection, the successes/failures were binary rather than due to poor overlap. On the endorectal coil data, the single-center model often failed to segment the distorted prostate and opt to segment the more circular endorectal coil. On the PCNN data, both models sometimes failed catastrophically and segmented the femoral heads instead of the prostate.
+On the Multicenter Data testing fold, mean whole-gland DSC was 0.905 for the multicenter model and 0.904 for the single-center model. On ProstateX RUMC, the corresponding values were 0.906 and 0.916, respectively. The single-center model, having never seen endorectal coil or wide-field images, performed poorly in those cohorts (DSC 0.593 and 0.558, respectively). The multicenter model was able to generalize better to the wide-field PCNN data that it also did not encounter in training, achieving DSC 0.882. Upon inspection, the successes/failures were binary rather than due to poor overlap. On the endorectal coil data, the single-center model often failed to segment the distorted prostate and opt to segment the more circular endorectal coil. On the PCNN data, both models sometimes failed catastrophically and segmented the femoral heads instead of the prostate.
 
 **Table 1. Mean whole-gland Dice similarity coefficient (DSC), testing cohorts only.**
 
@@ -33,9 +81,9 @@ Both models had lower MAE, RMSE, MAPE, and RMSPE than clinical ellipsoid estimat
 | --- | --- | --- | --- |
 | Multicenter Data Testing (n = 22) | — | 3.42; 4.07 | 2.72; 3.32 |
 | ProstateX RUMC (n = 157) | 9.20; 12.06 | 5.09; 6.47 | 4.57; 5.85 |
-| Toronto JDMI (n = 383) | 7.18; 9.42 | 4.87; 6.76 | 5.28; 6.61 |
+| Toronto JDMI (n = 383) | 7.18; 9.42 | 4.87; 6.76 | 5.28; 6.63 |
 | PI-CAI RUMC excluding ProstateX RUMC (n = 275) | 12.87; 16.32 | 4.25; 5.26 | 1.42; 2.20 |
-| Toronto JDMI Additional (n = 3,722) | 8.12; 11.70 | 4.03; 5.74 | 4.72; 6.55 |
+| Toronto JDMI Additional (n = 3,722) | 8.12; 11.70 | 4.03; 5.74 | 4.71; 6.49 |
 | PI-CAI ZGT (n = 168) | 6.62; 8.92 | 2.68; 3.86 | 1.81; 2.43 |
 | Multicenter Data Testing (ERC) (n = 13) | — | 2.43; 3.17 | 6.33; 8.04 |
 | PI-CAI PCNN (wide field) (n = 315) | 11.69; 16.78 | 6.35; 8.48 | 12.68; 20.65 |
@@ -50,9 +98,9 @@ Both models had lower MAE, RMSE, MAPE, and RMSPE than clinical ellipsoid estimat
 | --- | --- | --- | --- |
 | Multicenter Data Testing (n = 22) | — | 8.52; 10.13 | 6.47; 7.87 |
 | ProstateX RUMC (n = 157) | 16.36; 21.17 | 8.85; 10.93 | 8.10; 10.47 |
-| Toronto JDMI (n = 383) | 13.89; 18.07 | 9.01; 11.35 | 10.04; 12.37 |
+| Toronto JDMI (n = 383) | 13.89; 18.07 | 9.01; 11.35 | 10.03; 12.36 |
 | PI-CAI RUMC excluding ProstateX RUMC (n = 275) | 28.14; 33.98 | 9.65; 12.18 | 3.20; 4.90 |
-| Toronto JDMI Additional (n = 3,722) | 13.05; 18.14 | 6.39; 9.00 | 7.85; 13.49 |
+| Toronto JDMI Additional (n = 3,722) | 13.05; 18.14 | 6.39; 9.00 | 7.76; 12.82 |
 | PI-CAI ZGT (n = 168) | 14.35; 19.14 | 5.87; 7.90 | 4.30; 6.56 |
 | Multicenter Data Testing (ERC) (n = 13) | — | 6.33; 8.69 | 15.78; 19.50 |
 | PI-CAI PCNN (wide field) (n = 315) | 22.23; 29.57 | 13.09; 18.82 | 35.83; 65.90 |
@@ -98,9 +146,6 @@ Table 4 compares automated and clinical ellipsoid volume errors in cases exceedi
 
 ## Impact on PSAD category and simulated biopsy recommendation
 
-<!-- TODO: Move this to methods
-PSAD was calculated with the same patient-level PSA for each volume method, in ng/mL². Unrounded values were assigned to four categories: <0.10, 0.10–<0.15, 0.15–<0.20, and ≥0.20, with cutoff equality assigned to the higher category. Closeness was absolute ordinal distance from the reference-volume-derived category. Equal distance includes identical categories and different categories equally far from reference; a closer category can still be incorrect. One of two ProstateX outliers lacked evaluable PSA; all common-criteria outliers in the other cohorts were PSAD evaluable.
- -->
 
 PSAD categories calculated using automated volumetry were closer to the reference category in 73/143 Toronto JDMI Additional outliers, equally distant in 63, and farther in seven (Table 5). Across the first two reference cohorts with manual segmentation references, automated PSAD categories were closer in eight cases, equally distant in three, and farther in none (p = 0.008). Across all six cohorts, automated categories were closer in 116 cases, equally distant in 95, and farther in 21. (p < 0.001).
 
@@ -121,7 +166,6 @@ PSAD categories calculated using automated volumetry were closer to the referenc
 
 Forty-seven out of 233 disagreement cases had PI-RADS 3: none in ProstateX, three in Toronto JDMI, one in PI-CAI RUMC excluding ProstateX RUMC, 30 in Toronto JDMI Additional, one in ZGT, and 12 in PCNN. The individual cases are shown in Table 6. Twenty cases had unknown outcomes, comprising one Toronto JDMI and 19 Toronto Additional cases. 
 
-<!-- PI-CAI outcome-positive status was ISUP grade group ≥2, whereas Toronto used recorded CSCANCER Y; those definitions were kept separate. Simulated biopsy recommendations used unrounded PSAD ≥0.15 ng/mL². -->
 
 In Toronto JDMI, biopsy recommendation did not change using any of reference, manual ellipsoid, or automated volumetry, one recommendation and negative biopsy, one avoidance and negative biopsy, one recommendation and unknown outcome.
 
@@ -156,7 +200,7 @@ Unverified table:
 ³ False negative → true positive. ⁴ True positive → false negative.
  -->
 
-Overall, 13 of 47 (27.7%) PI-RADS 3 cases had changed biopsy recommendations between manual ellipsoid and automated volumetry, with nine (69.2%) moving toward the reference recommendation and four (30.8%) moving away. Among the changed cases, six had known negative outcomes and automated volumetry correctedly changed to recommending biopsy in all six; two had known positive outcomes and automated volumetry correctly changed to avoidance in one and incorrectly changed to recommendation in the other. Five cases had unknown outcomes.
+Overall, 13 of 47 (27.7%) PI-RADS 3 cases had changed biopsy recommendations between manual ellipsoid and automated volumetry, with nine (69.2%) moving toward the reference recommendation and four (30.8%) moving away. Among the changed cases, six had known negative outcomes and automated volumetry correctedly changed to avoiding biopsy in all six; two had known positive outcomes and automated volumetry correctly changed to recommendation in one and incorrectly changed to avoidance in the other. Five cases had unknown outcomes.
 
 **Table 6. Every PI-RADS 3 common-criteria outlier, including unknown outcomes.** Method cells give volume in mL; PSAD in ng/mL²; and the simulated biopsy recommendation. Displayed PSAD is rounded to three decimals; decisions use unrounded values. Reference is Bosma22b for PI-CAI, median manual-reader planimetry for Toronto JDMI, and nnUNet702 for Toronto JDMI Additional. Rows are sorted globally by outcome (ISUP ≥2, CSCANCER Y, ISUP 0–1, CSCANCER N, then Unknown), then reference, manual, and automated biopsy recommendation (Recommend before Avoid, missing last), then the stated cohort order and case identifier. Identifiers are retained for local audit.
 

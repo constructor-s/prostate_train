@@ -77,7 +77,8 @@ assert (REPO_ROOT / 'pyproject.toml').is_file(), 'Set REPO_ROOT to the repositor
 DATA_ROOT = REPO_ROOT / 'data_internal/hlab20260928'
 CLINICAL_CSV = DATA_ROOT / 'hlab20260928_t2_image_listing_full_clinical.csv'
 WORKBOOK = DATA_ROOT / 'PROSATELLMVOL20260703-12-WorkingBillShi.xlsx'
-EXCLUDE_JSON = DATA_ROOT / 'exclude.json'
+# Optional archived exclusions preserve a previously reviewed cohort.
+EXCLUDE_JSON = Path(globals().get('EXCLUDE_JSON', DATA_ROOT / 'exclude.json')).resolve()
 OUTPUT_DIR = REPO_ROOT / 'results/toronto_jdmi_clinical_volume'
 EXPECTED_CASES = 383
 GEOMETRY_TOLERANCE_MM = 0.5
@@ -172,23 +173,42 @@ assert cases.image_path.is_unique, 'Repeated eligible T2 paths; inspect local co
 # The workbook enriches the selected scans; it never selects a different visit.
 
 # %%
-with WORKBOOK.open('rb') as stream:
-    office = msoffcrypto.OfficeFile(stream)
-    try:
-        if office.is_encrypted():
-            password = getpass('Excel password: ')
-            try:
-                office.load_key(password=password, verify_password=True)
-            finally:
-                del password
-            with BytesIO() as decrypted:
-                office.decrypt(decrypted)
-                decrypted.seek(0)
-                workbook = pd.read_excel(decrypted, engine='openpyxl', dtype=object, keep_default_na=False)
-        else:
-            workbook = pd.read_excel(WORKBOOK, engine='openpyxl', dtype=object, keep_default_na=False)
-    finally:
-        del office
+# For a mask-only refresh, an explicitly supplied raw-field audit can replace
+# workbook decryption only when the workbook and listing match the prior run.
+WORKBOOK_AUDIT_PATH = globals().get('WORKBOOK_AUDIT_PATH')
+workbook_audit_provenance = None
+if WORKBOOK_AUDIT_PATH is not None:
+    audit_path = Path(WORKBOOK_AUDIT_PATH).resolve()
+    prior_metadata = json.loads((audit_path.parent / 'run_metadata.json').read_text())
+    for unchanged_input in (WORKBOOK, CLINICAL_CSV):
+        relative = str(unchanged_input.relative_to(REPO_ROOT))
+        assert hashlib.sha256(unchanged_input.read_bytes()).hexdigest() == prior_metadata['input_sha256'][relative], relative
+    workbook = pd.read_csv(audit_path, dtype=object, keep_default_na=False)
+    assert np.array_equal(pd.to_numeric(workbook.source_excel_row), np.arange(2, len(workbook) + 2))
+    workbook['aano'] = workbook.workbook_aano_raw
+    workbook['amrn'] = workbook.workbook_amrn_raw
+    workbook = workbook.drop(columns=['source_excel_row', 'workbook_aano_raw', 'workbook_amrn_raw', 'invalid_aano', 'duplicate_aano'])
+    workbook_audit_provenance = dict(path=str(audit_path.relative_to(REPO_ROOT)),
+        sha256=hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+        prior_metadata_sha256=hashlib.sha256((audit_path.parent / 'run_metadata.json').read_bytes()).hexdigest())
+else:
+    with WORKBOOK.open('rb') as stream:
+        office = msoffcrypto.OfficeFile(stream)
+        try:
+            if office.is_encrypted():
+                password = getpass('Excel password: ')
+                try:
+                    office.load_key(password=password, verify_password=True)
+                finally:
+                    del password
+                with BytesIO() as decrypted:
+                    office.decrypt(decrypted)
+                    decrypted.seek(0)
+                    workbook = pd.read_excel(decrypted, engine='openpyxl', dtype=object, keep_default_na=False)
+            else:
+                workbook = pd.read_excel(WORKBOOK, engine='openpyxl', dtype=object, keep_default_na=False)
+        finally:
+            del office
 
 # %% [markdown]
 # ## Link clinical fields to selected examinations
@@ -321,6 +341,8 @@ input_hashes = {}
 for path in (CLINICAL_CSV, EXCLUDE_JSON, WORKBOOK):
     with path.open('rb') as stream:
         input_hashes[str(path.relative_to(REPO_ROOT))] = hashlib.file_digest(stream, 'sha256').hexdigest()
+if workbook_audit_provenance is not None:
+    input_hashes[workbook_audit_provenance['path']] = workbook_audit_provenance['sha256']
 model_metadata = {}
 model_roots = {}
 for key in SELECTED_COMPARATORS:
@@ -330,7 +352,7 @@ for key in SELECTED_COMPARATORS:
     model_root = DATA_ROOT / f'seg_out_{model}'
     model_roots[key] = model_root
     saved_metadata = {}
-    for filename in ('plans.json', 'dataset.json', 'inference_config.json', 'predict_from_raw_data_args.json'):
+    for filename in ('plans.json', 'dataset.json', 'inference_config.json', 'predict_from_raw_data_args.json', 'manual_postprocessing.json'):
         path = model_root / filename
         if path.is_file():
             saved_metadata[filename] = json.loads(path.read_text())
@@ -2032,6 +2054,8 @@ metadata = dict(
     )},
     python_version=platform.python_version(), notebook_sha256=notebook_sha256,
     input_sha256=input_hashes, model_metadata=model_metadata,
+    exclusion_source=str(EXCLUDE_JSON.relative_to(REPO_ROOT)),
+    workbook_audit_reuse=workbook_audit_provenance,
     patient_identifier='amrn', examination_identifier='aano',
     workbook_amrn_normalization='Trim whitespace and remove one leading literal AIPR_; preserve leading zeros',
     psad_unit=PSAD_UNIT, n_psad_cases=len(psad_cases),

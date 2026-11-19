@@ -39,7 +39,7 @@ const colors = ['#00d5ff', '#50e070', '#ff9d30'];
 let index = 0, total = 0, info = null, cursor = [], images = [], busy = false;
 let displayedCursor = [];
 let version = 0, timer = null, rendering = false, renderPending = false, dirty = false, finished = false;
-const canvases = [];
+const canvases = [], panelLabels = [];
 let requestId = 0;
 function debug(text) {
   const line = `${new Date().toISOString()} ${text}`;
@@ -179,6 +179,9 @@ async function navigate(target, initial = false, targetId = null) {
     index = nextInfo.index; total = nextInfo.total; info = nextInfo; images = nextImages;
     cursor = info.cursor ? [...info.cursor] : [];
     displayedCursor = [...cursor];
+    for (let col = 0; col < 3; col++) {
+      panelLabels[col].textContent = `${planes[0]} · ${models[col]} · Vol = ${info.volumes_ml[col].toFixed(1)} mL`;
+    }
     draw(); debug(`Navigation: metadata ready for case ${index}`);
     dirty = true; finished = false; // Current case is recorded only when leaving it.
     $('title').textContent = `PI-CAI | ${info.center} | ${info.ID} | ${index+1} / ${total}`;
@@ -191,7 +194,7 @@ async function navigate(target, initial = false, targetId = null) {
 }
 for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
   const panel = document.createElement('div'); panel.className = 'panel';
-  const label = document.createElement('span'); label.className = 'label';
+  const label = document.createElement('span'); label.className = 'label'; panelLabels.push(label);
   label.textContent = `${planes[row]} · ${models[col]}`; label.style.color = colors[col];
   const canvas = document.createElement('canvas'); canvases.push(canvas);
   panel.append(canvas, label); $('grid').append(panel);

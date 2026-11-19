@@ -75,8 +75,9 @@ def load_case(case):
     gray = (np.clip(pixels, 0, 1) * 255).astype(np.uint8)
     coordinates = np.nonzero(masks[0])
     center = [int(np.rint(c.mean())) for c in coordinates] if masks[0].any() else [n//2 for n in gray.shape]
-    return dict(gray=gray, masks=masks, center=center,
-                spacing=nib.affines.voxel_sizes(images[0].affine).tolist())
+    spacing = nib.affines.voxel_sizes(images[0].affine)
+    volumes_ml = [float(np.count_nonzero(mask) * np.prod(spacing) / 1000) for mask in masks]
+    return dict(gray=gray, masks=masks, center=center, spacing=spacing.tolist(), volumes_ml=volumes_ml)
 
 
 def plane(array, axis, index):
@@ -257,7 +258,8 @@ def create_app(root=ROOT, cases=None, log_path=None):
         try:
             preload_window(index)
             data = volume(index)
-            info.update(shape=list(data['gray'].shape), spacing=data['spacing'], cursor=data['center'])
+            info.update(shape=list(data['gray'].shape), spacing=data['spacing'], cursor=data['center'],
+                        volumes_ml=data['volumes_ml'])
             info['panels'] = panel_urls(index, data['center'])
             app.logger.info('[%s] Returning metadata + nine binary image URLs: case %s', g.request_id, index)
         except Exception as exc:

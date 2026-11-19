@@ -13,6 +13,8 @@
 from pathlib import Path
 import hashlib
 import json
+import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import nibabel as nib
 import numpy as np
@@ -290,6 +292,7 @@ def grid_displacement(first, second):
 
 
 def measure_source(case, group, prediction_roots, scalar_reference=False):
+    audit_rows = []
     paths = {'image': Path(case.image_path), **{m: r / f'{case.ID}.nii.gz' for m, r in prediction_roots.items()}}
     if not scalar_reference:
         paths['gt'] = Path(case.reference_path)
@@ -334,7 +337,7 @@ def measure_source(case, group, prediction_roots, scalar_reference=False):
         result[f'{method}_prediction_path'] = str(paths[method].relative_to(REPO_ROOT))
         result[f'{method}_unit_anchor_path'] = anchor_path
         result[f'{method}_unit_anchor_max_displacement_mm'] = anchor_displacement
-        measurement_rows.append(dict(cohort=group, ID=case.ID, method=method, path=str(paths[method].relative_to(REPO_ROOT)),
+        audit_rows.append(dict(cohort=group, ID=case.ID, method=method, path=str(paths[method].relative_to(REPO_ROOT)),
             foreground_labels=str(foreground), voxel_count=n, volume_ml=volume, spatial_units=units,
             unit_anchor_path=anchor_path, unit_anchor_max_displacement_mm=anchor_displacement,
             image_max_corner_displacement_mm=displacement))
@@ -348,7 +351,7 @@ def measure_source(case, group, prediction_roots, scalar_reference=False):
             displacement = grid_displacement(images[method], images['gt'])
             assert displacement <= GEOMETRY_TOLERANCE_MM, (case.ID, method, 'Reference geometry mismatch', displacement)
             result[f'{method}_dsc'] = 2 * int((masks[method] & masks['gt']).sum()) / (int(masks[method].sum()) + int(masks['gt'].sum()))
-    return result
+    return result, audit_rows
 
 
 measured = {}
@@ -360,10 +363,15 @@ for group, cases in source_cases.items():
     for method, root in roots.items():
         validate_model(root, method, historical=(group == 'toronto' and method == 'nnunet274'))
     records = []
-    for i, case in enumerate(cases.itertuples(index=False), 1):
-        records.append(measure_source(case, group, roots, scalar_reference=(group == 'toronto' and case.has_manual_reference)))
-        if i % 100 == 0 or i == len(cases):
-            print(f'Measured {group}: {i}/{len(cases)}', flush=True)
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as executor:
+        results = executor.map(
+            lambda case: measure_source(case, group, roots, scalar_reference=(group == 'toronto' and case.has_manual_reference)),
+            cases.itertuples(index=False))
+        for i, (result, audit_rows) in enumerate(results, 1):
+            records.append(result)
+            measurement_rows.extend(audit_rows)
+            if i % 100 == 0 or i == len(cases):
+                print(f'Measured {group}: {i}/{len(cases)}', flush=True)
     measured[group] = cases.merge(pd.DataFrame(records), on='ID', validate='one_to_one')
 
 # Multicenter testing and ERC cohorts have masks and no clinical comparator.
@@ -378,7 +386,8 @@ for split, folder, label in [('testing', 'pooled2_test', 'Multicenter Data (exte
     for method, root in roots.items():
         validate_model(root, method)
     for case in entries.itertuples(index=False):
-        result = measure_source(case, split, roots)
+        result, audit_rows = measure_source(case, split, roots)
+        measurement_rows.extend(audit_rows)
         for method in roots:
             multicenter_metrics.append(dict(cohort=label, ID=case.ID, method=method,
                 gt_volume_ml=result['gt_volume_ml'], predicted_volume_ml=result[f'{method}_volume_ml'], dsc=result[f'{method}_dsc']))

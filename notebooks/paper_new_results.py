@@ -853,8 +853,8 @@ def outside_display(x, y, xlim, ylim):
 fig, axes = plt.subplots(6, 2, figsize=(7, 9), sharex=True, sharey='col', constrained_layout=True)
 fig.get_layout_engine().set(w_pad=.04, h_pad=.04, wspace=.04, hspace=.04)
 # Layout-aware headings stay centered over their respective columns.
-for ax, heading in zip(axes[0], ['Absolute difference', 'Relative difference']):
-    ax.annotate(heading, xy=(.5, 1), xycoords='axes fraction', xytext=(0, 24), textcoords='offset points',
+for ax, heading in zip(axes[0], ['Bland-Altman, absolute mL', 'Bland-Altman, relative %']):
+    ax.annotate(heading, xy=(.5, 1), xycoords='axes fraction', xytext=(0, 18), textcoords='offset points',
                 ha='center', va='bottom', fontsize=10, weight='bold')
 axes[2, 0].set_ylabel('Clinical ellipsoid − Multicenter (mL)', fontsize=8)
 axes[2, 1].set_ylabel('100 × difference / pair mean (%)', fontsize=8)
@@ -871,7 +871,8 @@ for row_index, (key, v) in enumerate(cohorts.items()):
         mean, sd = y.mean(), y.std(ddof=1)
         lower, upper = mean-1.96*sd, mean+1.96*sd
         assert np.allclose([mean, lower, upper], expected[[f'mean_{scale}', f'lower_{scale}', f'upper_{scale}']].to_numpy(dtype=float))
-        ax.scatter(x[~common_both], y[~common_both], s=4, alpha=.15, color='black', edgecolors='none')
+        ax.scatter(x[~common_both], y[~common_both], s=8,
+                   alpha=.05 if key == 'toronto_surrogate' else .3, color='black', edgecolors='none')
         ax.axhline(mean, color='0.55', linewidth=.8, label=f'Dataset mean: {mean:.2f} {unit}')
         ax.axhline(lower, color='0.55', linestyle=':', linewidth=.7, label=f'Dataset 95% LoA: {lower:.2f} to {upper:.2f} {unit}')
         ax.axhline(upper, color='0.55', linestyle=':', linewidth=.7)
@@ -880,7 +881,7 @@ for row_index, (key, v) in enumerate(cohorts.items()):
                    label=f'Common criteria: {common_lower:.2f} to {common_upper:.2f} {unit}')
         ax.axhline(common_upper, color='black', linestyle='--', linewidth=.8, zorder=4)
         # Reuse the same membership in both panels; draw orange highlighted points last.
-        ax.scatter(x[common_both], y[common_both], s=4, alpha=1., color='#D55E00', edgecolors='white', linewidths=.35, zorder=5,
+        ax.scatter(x[common_both], y[common_both], s=8, alpha=1., color='#D55E00', edgecolors='white', linewidths=.35, zorder=5,
                    label=f'Outside both common criteria (n = {int(common_both.sum())})')
         title = COHORTS[key][1].replace(' excluding ', '\nexcluding ')
         ax.set_title(f'{title} (n = {len(v):,})', fontsize=7, pad=3)

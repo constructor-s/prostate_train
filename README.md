@@ -231,3 +231,18 @@ its Python stack to the server terminal without stopping it. Review-note text
 is omitted from diagnostic logs.
 Use the `Booting worker with pid` startup log to identify that worker; Gunicorn
 also has a separate master process.
+
+### Toronto full-cohort contour review
+
+Run `.venv/bin/python src/toronto_review.py` and open http://127.0.0.1:5000
+(or forward that port over SSH). The first launch builds an eight-thread volume
+index for every row of the full clinical listing. Three synchronized views overlay
+nnUNet702/274/236 whole-gland contours; the fourth panel shows their volumes in mL.
+Cases are ordered by increasing nnUNet702 volume, with failed measurements last.
+The rating applies to nnUNet702 and is saved when navigating away from a case.
+
+Index, provenance, ratings, and resume state are stored in
+`results/toronto_manual_review/`. Use `--build-index` to build or validate the index
+without serving, `--rebuild-index` to recompute it and exit after source changes,
+and `--workers N` to adjust indexing concurrency (default 8). Restart the viewer
+after rebuilding. No exclusions or reference-volume eligibility filters are applied.

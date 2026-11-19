@@ -129,5 +129,197 @@ class BlandAltmanDisplayTests(unittest.TestCase):
             plt.close('all')
 
 
+class SourceCohortTests(unittest.TestCase):
+    def selection(self, directory, exclusions):
+        root = Path(directory)
+        base = root / 'data_internal/hlab20260928'
+        base.mkdir(parents=True, exist_ok=True)
+        ids = ['AIPR_1_20200101_a', 'AIPR_2_20200101_b', 'AIPR_3_20200101_c']
+        pd.DataFrame(dict(ID=ids, t2=['a', 'b', 'c'], ground_truth_volume_ml=[20., np.nan, 0.],
+                          vol_report_ref=[20., 30., 40.])).to_csv(base / 'hlab20260928_t2_image_listing_full_clinical.csv', index=False)
+        import json
+        (base / 'exclude.json').write_text(json.dumps(exclusions))
+        namespace = dict(REPO_ROOT=root, DATA_ROOT=root / 'data/raw', OUTPUT_DIR=root, pd=pd, np=np, Path=Path, input_sha256={}, hashlib=__import__('hashlib'), json=json)
+        reader = next(n for n in ast.parse(SOURCE).body if isinstance(n, ast.FunctionDef) and n.name == 'read_input')
+        exec(compile(ast.Module(body=[reader], type_ignores=[]), str(NOTEBOOK), 'exec'), namespace)
+        section = SOURCE[SOURCE.index("TORONTO_ROOT ="):SOURCE.index('marksheet = read_input')]
+        exec(compile(section, str(NOTEBOOK), 'exec'), namespace)
+        return namespace
+
+    def test_current_exclusions_partition_and_unmatched_duplicate_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ns = self.selection(directory, [{'aano': 'a', 'reason': 'first'}, {'aano': 'a', 'description': 'second'}, {'aano': 'absent'}])
+            listing = ns['listing']
+            self.assertEqual(listing.loc[listing.included, 'ID'].tolist(), ['AIPR_2_20200101_b', 'AIPR_3_20200101_c'])
+            self.assertTrue(listing.loc[listing.included, 'analysis_cohort'].eq('toronto_surrogate').all())
+            self.assertEqual(listing.iloc[0].exclusion_reason, 'first; second')
+            self.assertEqual(int(ns['exclusion_audit'].duplicate_accession.sum()), 2)
+            self.assertEqual(int((~ns['exclusion_audit'].matched_source).sum()), 1)
+            ns = self.selection(directory, [{'aano': 'b'}])
+            self.assertEqual(ns['listing'].loc[ns['listing'].included, 'analysis_cohort'].tolist(), ['toronto_manual', 'toronto_surrogate'])
+
+    def test_empty_exclusion_list_keeps_every_source_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ns = self.selection(directory, [])
+            self.assertTrue(ns['listing'].included.all())
+            self.assertEqual(ns['listing'].analysis_cohort.tolist(), ['toronto_manual', 'toronto_surrogate', 'toronto_surrogate'])
+
+    def test_no_upstream_notebook_or_analysis_table_reads(self):
+        for forbidden in ['check_record(', 'qi[', 'comparator_summary.csv', 'psa_density_biopsy_audit.csv',
+                          'volume_disagreement_quality_improvement/', 'per_case_metrics.csv', 'workbook_key_audit.csv']:
+            self.assertNotIn(forbidden, SOURCE)
+
+
+class DirectMaskTests(unittest.TestCase):
+    def namespace(self, root):
+        import hashlib
+        import nibabel as nib
+        from itertools import product
+        namespace = dict(REPO_ROOT=root, np=np, nib=nib, pd=pd, Path=Path, hashlib=hashlib, product=product,
+                         input_sha256={}, measurement_rows=[], postprocessed_sha256={}, GEOMETRY_TOLERANCE_MM=.5,
+                         UNIT_ANCHOR_TOLERANCE_MM=.01)
+        nodes = [n for n in ast.parse(SOURCE).body if isinstance(n, ast.FunctionDef)
+                 and n.name in ['record_input', 'grid_displacement', 'measure_source']]
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(NOTEBOOK), 'exec'), namespace)
+        return namespace
+
+    def fixture(self, root, empty_prediction=False, reference_units='mm', shift=0., invalid_label=False):
+        import nibabel as nib
+        from types import SimpleNamespace
+        shape = (3, 4, 5)
+        affine = np.diag([2., 3., 4., 1.])
+        paths = {}
+        for method in ['image', 'gt', 'model']:
+            data = np.zeros(shape, dtype=np.uint8)
+            if method == 'gt':
+                data[0, 0, :3] = [1, 2, 3]
+            if method == 'model' and not empty_prediction:
+                data[0, 0, :2] = 1
+            if invalid_label and method == 'model':
+                data[0, 0, 0] = 9
+            matrix = affine.copy()
+            if method == 'model':
+                matrix[0, 3] += shift
+            img = nib.Nifti1Image(data, matrix)
+            img.header.set_xyzt_units(reference_units if method == 'gt' else 'mm')
+            path = root / ('case.nii.gz' if method == 'model' else f'{method}.nii.gz')
+            nib.save(img, path)
+            paths[method] = path
+        case = SimpleNamespace(ID='case', image_path=paths['image'], reference_path=paths['gt'], manual_reference_ml=42.)
+        return case, {'model': root}
+
+    def test_union_anisotropic_volume_and_dsc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); ns = self.namespace(root)
+            case, roots = self.fixture(root)
+            row = ns['measure_source'](case, 'toronto', roots)
+            self.assertAlmostEqual(row['gt_volume_ml'], .072)
+            self.assertAlmostEqual(row['model_volume_ml'], .048)
+            self.assertAlmostEqual(row['model_dsc'], .8)
+
+    def test_empty_prediction_retained_and_scalar_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); ns = self.namespace(root)
+            case, roots = self.fixture(root, empty_prediction=True)
+            row = ns['measure_source'](case, 'toronto', roots)
+            self.assertEqual(row['model_volume_ml'], 0.)
+            self.assertEqual(row['model_dsc'], 0.)
+            row = ns['measure_source'](case, 'toronto', roots, scalar_reference=True)
+            self.assertEqual(row['gt_volume_ml'], 42.)
+            self.assertTrue(np.isnan(row['model_dsc']))
+
+    def test_unknown_units_require_close_mm_anchor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); ns = self.namespace(root)
+            case, roots = self.fixture(root, reference_units='unknown')
+            row = ns['measure_source'](case, 'toronto', roots)
+            self.assertEqual(row['gt_unit_anchor_path'], 'image.nii.gz')
+            with self.assertRaisesRegex(AssertionError, 'Spatial units'):
+                ns['measure_source'](case, 'picai', roots)
+            import nibabel as nib
+            img = nib.load(case.reference_path)
+            affine = img.affine.copy(); affine[0, 3] = .02
+            nib.save(nib.Nifti1Image(np.asanyarray(img.dataobj), affine, img.header), case.reference_path)
+            with self.assertRaisesRegex(AssertionError, 'known-mm anchor'):
+                ns['measure_source'](case, 'toronto', roots)
+
+    def test_reject_geometry_labels_and_modified_postprocessed_mask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); ns = self.namespace(root)
+            case, roots = self.fixture(root, shift=1.)
+            with self.assertRaisesRegex(AssertionError, 'displacement'):
+                ns['measure_source'](case, 'toronto', roots)
+            ns = self.namespace(root); case, roots = self.fixture(root, invalid_label=True)
+            with self.assertRaisesRegex(AssertionError, 'Unexpected labels'):
+                ns['measure_source'](case, 'toronto', roots)
+            ns = self.namespace(root); case, roots = self.fixture(root)
+            ns['postprocessed_sha256']['case.nii.gz'] = 'wrong'
+            with self.assertRaisesRegex(AssertionError, 'Postprocessed mask hash mismatch'):
+                ns['measure_source'](case, 'toronto', roots)
+
+
+class PredictionProvenanceTests(unittest.TestCase):
+    def test_folds_and_explicit_historical_limitation(self):
+        import json
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            name = 'Dataset274_raw_3d_fullres_5fold'
+            predictions = root / 'predictions'
+            bundle = root / 'bundles' / name
+            predictions.mkdir(); (bundle / 'models').mkdir(parents=True)
+            labels = {'labels': {'background': 0, 'class1': 1}}
+            for path in [predictions / 'dataset.json', bundle / 'models/dataset.json']:
+                path.write_text(json.dumps(labels))
+            (predictions / 'plans.json').write_text(json.dumps({'dataset_name': 'Dataset274_raw'}))
+            ns = dict(REPO_ROOT=root, Path=Path, json=json, hashlib=hashlib, pd=pd,
+                      input_sha256={}, model_metadata={}, postprocessed_sha256={}, MODEL_NAMES={'nnunet274': name})
+            nodes = [n for n in ast.parse(SOURCE).body if isinstance(n, ast.FunctionDef)
+                     and n.name in ['read_input', 'record_input', 'validate_model']]
+            exec(compile(ast.Module(body=nodes, type_ignores=[]), str(NOTEBOOK), 'exec'), ns)
+            with self.assertRaisesRegex(AssertionError, 'Missing inference configuration'):
+                ns['validate_model'](predictions, 'nnunet274')
+            ns['validate_model'](predictions, 'nnunet274', historical=True)
+            self.assertFalse(ns['model_metadata']['predictions']['inference_verified'])
+            self.assertIn('unverified', ns['model_metadata']['predictions']['inference_limitation'])
+            ns['model_metadata'].clear()
+            config = dict(folds=[0], bundle_root=str(bundle), arguments=dict(tile_step_size=.8,
+                use_mirroring=False, use_gaussian=True, checkpoint_name='checkpoint_final.pt'))
+            config_path = predictions / 'inference_config.json'
+            config_path.write_text(json.dumps(config))
+            with self.assertRaises(AssertionError):
+                ns['validate_model'](predictions, 'nnunet274')
+            config['folds'] = [0, 1, 2, 3, 4]
+            config_path.write_text(json.dumps(config))
+            ns['validate_model'](predictions, 'nnunet274')
+            self.assertTrue(ns['model_metadata']['predictions']['inference_verified'])
+
+
+class ClinicalLinkageTests(unittest.TestCase):
+    def test_psa_precedence_correction_censoring_and_missing_outcomes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workbook = pd.DataFrame(dict(
+                aano=['a', '333abfe652a8889', 'c'], amrn=['AIPR_1', 'AIPR_2', 'AIPR_3'],
+                psa_report_ref=['>5,2', '', '0'], psa=['10', '999', ''],
+                reportmaxpirads_ref=['3', '3', '5'], CSCANCER=['YES', 'NO BIOPSY', 'N']))
+            readers = ['p_axt2_ch_vol', 'p_axt2_ah_vol', 'p_axt2_dd_vol', 'p_axt2_ao_vol',
+                       'p_axt2_chepg_vol', 'p_axt2_epgch_vol', 'p_axt2_epg_vol']
+            for field in readers:
+                workbook[field] = ['20', '', ''] if field == readers[0] else ['', '', '']
+            cases = pd.DataFrame(dict(ID=['one', 'two', 'three'], aano=workbook.aano,
+                                      amrn=['1', '2', '3'], manual_reference_ml=[20., np.nan, np.nan]))
+            ns = dict(np=np, pd=pd, workbook=workbook, measured={'toronto': cases}, OUTPUT_DIR=Path(directory))
+            section = SOURCE[SOURCE.index('READER_FIELDS ='):SOURCE.index('# %% [markdown]\n# ## Independent analysis cohorts')]
+            exec(compile(section, str(NOTEBOOK), 'exec'), ns)
+            clinical = ns['clinical']
+            np.testing.assert_allclose(clinical.psa_ng_ml, [5.2, 28.9, np.nan], equal_nan=True)
+            self.assertEqual(clinical.psa_source.tolist(), ['psa_report_ref', 'psa', 'unavailable'])
+            self.assertEqual(clinical.psa_selected_censored.tolist(), [True, False, False])
+            self.assertEqual(clinical.pirads_3.tolist(), [True, True, False])
+            self.assertEqual(clinical.outcome_known.tolist(), [True, False, True])
+            self.assertTrue(pd.isna(clinical.iloc[1].outcome))
+            self.assertEqual(len(clinical), 3)  # Missing PSA/outcome never removes a volume case.
+
+
 if __name__ == '__main__':
     unittest.main()

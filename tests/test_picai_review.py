@@ -60,6 +60,7 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(first['index'], 0)
             self.assertEqual(len(first['panels']), 9)
             self.assertIn('spacing', first)
+            np.testing.assert_allclose(first['volumes_ml'], [.192, .192, .192])
             self.assertFalse(path.exists())  # Opening a case does not save a review row.
             previous = dict(index=0, rating='unsure', note='check base')
             unknown = client.post('/api/navigate', json=dict(target_id='missing', previous=previous))
@@ -194,6 +195,7 @@ class ReviewTests(unittest.TestCase):
             case = self.fixture(directory)
             data = load_case(case)
             self.assertEqual(data['spacing'], [2, 3, 4])
+            np.testing.assert_allclose(data['volumes_ml'], [.192, .192, .192])
             self.assertEqual(data['center'], [2, 2, 4])
             self.assertGreater(data['gray'][0, 0, 0], data['gray'][-1, 0, 0])  # x flipped into RAS
             panels = render_slices(data, data['center'])
@@ -203,7 +205,9 @@ class ReviewTests(unittest.TestCase):
             self.assertTrue(np.any(np.all(np.asarray(image) == [0, 213, 255], axis=2)))
             empty = nib.load(case['paths'][1])
             nib.save(nib.Nifti1Image(np.zeros(empty.shape, dtype=np.uint8), empty.affine, empty.header), case['paths'][1])
-            self.assertEqual(load_case(case)['center'], [2, 2, 3])
+            empty_data = load_case(case)
+            self.assertEqual(empty_data['center'], [2, 2, 3])
+            np.testing.assert_allclose(empty_data['volumes_ml'], [0, .192, .192])
             bad = nib.load(case['paths'][3])
             bad_affine = bad.affine.copy()
             bad_affine[0, 3] += 10

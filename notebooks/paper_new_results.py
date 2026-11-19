@@ -3,7 +3,8 @@
 #
 # Assemble eight testing cohorts and ask whether the multicenter model is closer to the
 # reference when it disagrees with clinical ellipsoid volumetry. All inputs are
-# saved analysis exports: no inference, cohort reselection, or mask processing.
+# source clinical data, reviewed manifests, and saved masks. No older analysis
+# exports, inference, mask modification, or resampling are required.
 # Run cells in order. Generated tables and private case audits stay in
 # results/paper_new_results/. Manuscript prose is edited in paper_new.md;
 # this notebook replaces only the six marked table blocks there.
@@ -13,10 +14,11 @@ from pathlib import Path
 import hashlib
 import json
 from datetime import datetime, timezone
+import nibabel as nib
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from itertools import combinations
+from itertools import combinations, product
 from scipy.stats import binomtest
 from statsmodels.stats.multitest import multipletests
 
@@ -33,52 +35,30 @@ BA_XLIM = globals().get('BA_XLIM', None)
 BA_YLIM = globals().get('BA_YLIM', None)
 BA_REL_YLIM = globals().get('BA_REL_YLIM', None)
 SITES = ['RUMC', 'ZGT', 'PCNN']
-# Manual references first, then automated surrogates; PCNN is the failure analysis. Expanded Toronto's directory name is historical.
+# Manual references first, then automated surrogates; counts are derived below.
 COHORTS = {
-    'prostatex': ('prostatex_linked_volume', 'ProstateX RUMC', 157, 'Manual whole-gland segmentation'),
-    'toronto_manual': ('toronto_jdmi_clinical_volume', 'Toronto JDMI', 383, 'Median manual-reader planimetry'),
-    'picai_RUMC': ('picai_test_clinical_volume/RUMC', 'PI-CAI RUMC', 391, 'Bosma22b automated surrogate'),
-    'toronto_surrogate': ('toronto_jdmi_4111_clinical_volume', 'Toronto JDMI Expanded', 4105, 'nnUNet702 automated surrogate'),
-    'picai_ZGT': ('picai_test_clinical_volume/ZGT', 'PI-CAI ZGT', 168, 'Bosma22b automated surrogate'),
-    'picai_PCNN': ('picai_test_clinical_volume/PCNN', 'PI-CAI PCNN (wide field)', 315, 'Bosma22b automated surrogate'),
+    'prostatex': ('', 'ProstateX RUMC', None, 'Manual whole-gland segmentation'),
+    'toronto_manual': ('', 'Toronto JDMI', None, 'Median manual-reader planimetry'),
+    'picai_RUMC': ('', 'PI-CAI RUMC', None, 'Bosma22b automated surrogate'),
+    'toronto_surrogate': ('', 'Toronto JDMI Additional', None, 'nnUNet702 automated surrogate'),
+    'picai_ZGT': ('', 'PI-CAI ZGT', None, 'Bosma22b automated surrogate'),
+    'picai_PCNN': ('', 'PI-CAI PCNN (wide field)', None, 'Bosma22b automated surrogate'),
 }
 METHODS = {'nnunet274': 'Multicenter', 'rumcnotprostatexnoclinical236': 'Single-center', 'clinical': 'Clinical ellipsoid'}
 CUTOFFS = np.array([.10, .15, .20])
+SOURCE_NOTEBOOK_SHA256 = hashlib.sha256((REPO_ROOT / 'notebooks/paper_new_results.py').read_bytes()).hexdigest()
 input_sha256 = {}
-provenance_reviews = []
 
 # Small I/O helpers keep hashing and Markdown escaping consistent across tables.
 def read_input(relative, kind='csv'):
-    path = REPO_ROOT / relative
-    input_sha256[str(relative)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    path = Path(relative)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    with path.open('rb') as stream:
+        input_sha256[str(path.relative_to(REPO_ROOT))] = hashlib.file_digest(stream, 'sha256').hexdigest()
     if kind == 'json':
         return json.loads(path.read_text())
     return pd.read_csv(path, low_memory=False, float_precision='round_trip')
-
-
-def check_record(record):
-    for relative, digest in record.get('input_sha256', {}).items():
-        path = REPO_ROOT / relative
-        actual = hashlib.sha256(path.read_bytes()).hexdigest()
-        if actual != digest:
-            # Two reviewed provenance drifts are checked semantically below:
-            # archived selection is rederived from the full saved cohort audit;
-            # current exclusions are compared explicitly, never substituted.
-            reviewed_current = {
-                'notebooks/toronto_jdmi_clinical_volume.py': '561b65240686f90ae6474d99024be9e7c72e2e0f12c83675254b9a40d30bdf68',
-                'data_internal/hlab20260928/exclude.json': '9880cb4617c175d27fc1f907d5f0f2560c5e1059d927848a4ad1a9c4a115895f',
-            }
-            assert actual == reviewed_current.get(relative), f'Stale upstream input: {relative}'
-            review = dict(path=relative, recorded_sha256=digest, current_sha256=actual,
-                          resolution='Revalidated archived selection against full cohort audit; current exclusion differences exported; requested calculations recomputed from unchanged saved measurements')
-            if review not in provenance_reviews:
-                provenance_reviews.append(review)
-        input_sha256[relative] = actual
-    postprocessing = record.get('manual_postprocessing')
-    if postprocessing:
-        path = REPO_ROOT / postprocessing['path']
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == postprocessing['sha256']
-        input_sha256[postprocessing['path']] = postprocessing['sha256']
 
 
 def markdown(frame):
@@ -104,238 +84,476 @@ def fmt_p(value):
     return 'Undefined' if pd.isna(value) else ('<0.001' if value < .001 else f'{value:.3f}')
 
 # %% [markdown]
-# ## Reconcile current exports before combining cohorts
+# ## Source cohorts and exclusion audit
 #
-# All three site runs repeat ProstateX and Toronto. Require identical case
-# audits for those repeated cohorts, then include each only once. Preserve the
-# requested archived Toronto membership; audit the current exclusion-file drift
-# (4109 current versus 4105 archived) explicitly. Verify saved
-# provenance hashes, current manifests, one case per patient, source PSAD and
-# biopsy decisions. Fail rather than combine stale or inconsistent exports.
+# These cells read original clinical files and reviewed manifests, never another
+# notebook's tables. Toronto accession exclusions apply to every endpoint. A
+# positive finite manual volume defines the manual cohort; the remaining eligible
+# patients form Additional. Missing PSA or outcomes affect secondary endpoints only.
 
 # %%
-qi = {}
-for site in SITES:
-    root = f'results/volume_disagreement_quality_improvement/{site}'
-    meta = read_input(f'{root}/run_metadata.json', 'json')
-    assert meta['site'] == site
-    for record in meta['cohorts']:
-        check_record(record)
-    qi[site] = read_input(f'{root}/case_audit.csv')
-    assert not qi[site].duplicated(['cohort', 'ID']).any()
-for key in ['prostatex', 'toronto_manual', 'toronto_surrogate']:
-    baseline = qi['RUMC'].loc[qi['RUMC'].cohort.eq(key)].sort_values('ID').reset_index(drop=True)
-    for site in ['ZGT', 'PCNN']:
-        other = qi[site].loc[qi[site].cohort.eq(key)].sort_values('ID').reset_index(drop=True)
-        pd.testing.assert_frame_equal(baseline, other, check_exact=True)
+DATA_ROOT = REPO_ROOT / 'data/raw'
+TORONTO_ROOT = REPO_ROOT / 'data_internal/hlab20260928'
+STUDY_ROOT = REPO_ROOT / 'results/20261105_tile0.8_nomirroring'
+PICAI_ROOT = DATA_ROOT / 'zenodo/picai/picai_labels'
+MODEL_NAMES = {'nnunet274': 'Dataset274_raw_3d_fullres_5fold',
+               'rumcnotprostatexnoclinical236': 'Dataset236_raw_3d_fullres_5fold'}
+GEOMETRY_TOLERANCE_MM = .5
+UNIT_ANCHOR_TOLERANCE_MM = .01
+model_metadata = {}
+measurement_rows = []
+postprocessed_sha256 = {}
 
-cohorts, audits, provenance = {}, {}, []
-for key, (directory, name, expected_n, reference) in COHORTS.items():
-    root = f'results/{directory}'
-    v = read_input(f'{root}/comparator_volumes.csv').set_index('ID', drop=False)
-    audit = read_input(f'{root}/psa_density_biopsy_audit.csv').set_index('ID', drop=False)
-    psad = read_input(f'{root}/psa_density_per_case.csv').set_index('ID')
-    biopsy = read_input(f'{root}/psa_density_biopsy_per_case.csv').set_index('ID')
-    meta = read_input(f'{root}/run_metadata.json', 'json')
-    check_record(meta)
-    assert v.index.is_unique and audit.index.is_unique and psad.index.is_unique and biopsy.index.is_unique
-    assert len(v) == expected_n and set(v.index) == set(audit.index)
-    audit = audit.loc[v.index]
-    membership_hash = hashlib.sha256('\n'.join(sorted(v.index)).encode()).hexdigest()
-    if 'cohort_sha256' in meta:
-        assert meta['cohort_sha256'] == membership_hash
-    if 'n_patients' in meta:
-        assert meta['n_patients'] == expected_n
-    if key.startswith('picai') or key == 'prostatex':
-        manifest_path = 'configs/picai_test_clinical_folds.json' if key.startswith('picai') else 'configs/rumcnotprostatexnoclinical_folds.json'
-        manifest = read_input(manifest_path, 'json')
-        fold = f'testing_{key.split("_")[1]}' if key.startswith('picai') else 'testing'
-        assert set(v.index) == {row['id'] for row in manifest[fold]}
-        assert v.patient_id.is_unique
-        if key.startswith('picai'):
-            assert v.center.eq(key.split('_')[1]).all()
-            training = {int(row['id'].split('_')[1]) for row in manifest['training']}
-            assert not set(v.patient_id) & training
-    else:
-        assert v.amrn.is_unique
-        listing = read_input(f'{root}/cohort_audit.csv')
-        exclusions = read_input('data_internal/hlab20260928/exclude.json', 'json')
-        excluded_accessions = {entry['aano'] for entry in exclusions}
-        assert len(excluded_accessions) == 11
-        include = ~listing.aano.isin(excluded_accessions)
-        if key == 'toronto_manual':
-            reference_volume = pd.to_numeric(listing.ground_truth_volume_ml, errors='coerce')
-            include &= np.isfinite(reference_volume) & reference_volume.gt(0)
-        archived_include = listing.included
-        assert archived_include.dtype == bool
-        assert set(listing.loc[archived_include, 'ID']) == set(v.index), 'Saved Toronto selection differs from full audit'
-        difference = listing.loc[include.ne(archived_include), ['ID', 'aano', 'exclusion_reason']].copy()
-        difference['selected_saved'] = archived_include.loc[difference.index]
-        difference['selected_current'] = include.loc[difference.index]
-        difference.to_csv(OUTPUT_DIR / f'{key}_exclusion_membership_difference.csv', index=False)
-        if key == 'toronto_manual':
-            assert difference.empty, 'Manual Toronto membership changed'
-        else:
-            assert len(difference) == 8 and int(include.sum()) == 4109, 'Unreviewed expanded Toronto selection drift'
-        listing.loc[listing.aano_excluded, ['ID', 'aano', 'exclusion_reason']].to_csv(OUTPUT_DIR / f'{key}_archived_exclusions.csv', index=False)
-    for method in ['gt', *METHODS]:
-        col = f'{method}_volume_ml'
-        assert np.isfinite(v[col]).all() and v[col].ge(0).all()
-        assert np.allclose(v[col], audit[col], rtol=0, atol=1e-10)
-    assert v.gt_volume_ml.gt(0).all() and v.clinical_volume_ml.gt(0).all()
-    psa_col = 'psa_consolidated' if key.startswith('toronto') else 'psa_numeric_ng_ml'
-    v['psa_ng_ml'] = pd.to_numeric(audit[psa_col], errors='coerce')
-    for method in ['gt', 'clinical', 'nnunet274']:
-        v[f'{method}_psad'] = v.psa_ng_ml / v[f'{method}_volume_ml'].where(v[f'{method}_volume_ml'].gt(0))
-    v['psad_evaluable'] = (v.psa_ng_ml.gt(0) & np.isfinite(v[['gt_psad', 'clinical_psad', 'nnunet274_psad']]).all(axis=1))
-    assert set(psad.index) == set(v.index[v.psad_evaluable])
-    for method in ['gt', 'clinical', 'nnunet274']:
-        assert np.allclose(psad[f'{method}_psad'], v.loc[psad.index, f'{method}_psad'])
-        strata = psad[f'{method}_psad_stratum'].map({'0–<0.10': 0, '0.10–<0.15': 1, '0.15–<0.20': 2, '≥0.20': 3})
-        assert np.array_equal(strata, np.searchsorted(CUTOFFS, v.loc[psad.index, f'{method}_psad'], side='right'))
-    v['pirads_3'] = audit.biopsy_pirads_status.isin(['maximum_pirads_3', 'pirads_3'])
-    toronto = key.startswith('toronto')
-    v['outcome_known'] = audit.biopsy_outcome_status.eq('known_cscancer' if toronto else 'valid_case_isup')
-    v['outcome'] = audit.cscancer if toronto else audit.case_isup_numeric
-    v['outcome_definition'] = 'CSCANCER (Y/N)' if toronto else 'ISUP grade group (csPCa ≥2)'
-    v.loc[~v.outcome_known, 'outcome'] = pd.NA
-    assert set(biopsy.index) == set(v.index[v.psad_evaluable & v.pirads_3 & v.outcome_known])
-    for method in ['gt', 'clinical', 'nnunet274']:
-        assert np.array_equal(v.loc[biopsy.index, f'{method}_psad'].ge(.15), biopsy[f'{method}_biopsy_recommended'])
-    cohorts[key], audits[key] = v, audit
-    provenance.append(dict(cohort=key, n=len(v), reference=reference, cohort_sha256=membership_hash))
-assert set(cohorts['toronto_manual'].index) <= set(cohorts['toronto_surrogate'].index)
-shared_patients = {site: len(set(cohorts[f'picai_{site}'].patient_id) & set(cohorts['prostatex'].patient_id)) for site in SITES}
-print(pd.DataFrame(provenance).to_string(index=False))
-print('PI-CAI patients also in ProstateX:', shared_patients)
+listing = read_input(TORONTO_ROOT / 'hlab20260928_t2_image_listing_full_clinical.csv')
+assert {'ID', 't2', 'ground_truth_volume_ml', 'vol_report_ref'} <= set(listing)
+parts = listing.ID.astype('string').str.extract(r'^AIPR_([^_/\\]+)_(\d{8})_([^_/\\]+)$')
+listing[['amrn', 'exam_date', 'aano']] = parts
+assert parts.notna().all().all(), 'Invalid Toronto ID'
+assert listing.ID.is_unique and listing.amrn.is_unique, 'Repeated Toronto scan/patient'
+exclusions = read_input(TORONTO_ROOT / 'exclude.json', 'json')
+assert isinstance(exclusions, list) and all(isinstance(e, dict) and isinstance(e.get('aano'), str)
+    and e['aano'].strip() for e in exclusions), 'Exclusions require nonempty accession strings'
+exclusion_audit = pd.DataFrame(exclusions) if exclusions else pd.DataFrame(columns=['aano'])
+exclusion_audit['aano'] = exclusion_audit.aano.str.strip()
+exclusion_audit['duplicate_accession'] = exclusion_audit.aano.duplicated(keep=False)
+exclusion_audit['matched_source'] = exclusion_audit.aano.isin(listing.aano)
+exclusion_audit['exclusion_reason'] = ['; '.join(str(e[k]) for k in ('reason', 'description') if e.get(k))
+                                        or 'Listed in exclude.json' for e in exclusions]
+exclusion_audit.to_csv(OUTPUT_DIR / 'toronto_exclusion_audit.csv', index=False)
+reasons = exclusion_audit.groupby('aano', sort=False).exclusion_reason.agg('; '.join)
+listing['aano_excluded'] = listing.aano.isin(reasons.index)
+listing['exclusion_reason'] = listing.aano.map(reasons).fillna('')
+listing['manual_reference_ml'] = pd.to_numeric(listing.ground_truth_volume_ml, errors='coerce')
+listing['has_manual_reference'] = np.isfinite(listing.manual_reference_ml) & listing.manual_reference_ml.gt(0)
+listing['included'] = ~listing.aano_excluded
+listing['analysis_cohort'] = np.select([listing.aano_excluded, listing.has_manual_reference],
+                                     ['excluded', 'toronto_manual'], default='toronto_surrogate')
+listing.to_csv(OUTPUT_DIR / 'toronto_cohort_audit.csv', index=False)
+flow = pd.DataFrame([
+    dict(stage='Source clinical listing', n=len(listing)),
+    dict(stage='Accession exclusions', n=int(listing.aano_excluded.sum())),
+    dict(stage='Eligible', n=int(listing.included.sum())),
+    dict(stage='Manual reference', n=int((listing.included & listing.has_manual_reference).sum())),
+    dict(stage='Additional surrogate reference', n=int((listing.included & ~listing.has_manual_reference).sum())),
+])
+flow.to_csv(OUTPUT_DIR / 'toronto_cohort_flow.csv', index=False)
+print(flow.to_string(index=False), flush=True)
+print('Unmatched exclusion entries:', int((~exclusion_audit.matched_source).sum()), flush=True)
+toronto_cases = listing.loc[listing.included].copy()
+toronto_cases['clinical_volume_ml'] = pd.to_numeric(toronto_cases.vol_report_ref, errors='coerce')
+toronto_cases['image_path'] = toronto_cases.t2.map(lambda p: str(TORONTO_ROOT / p))
+toronto_cases['reference_path'] = toronto_cases.ID.map(
+    lambda case_id: str(TORONTO_ROOT / 'PROSATEPSAD' / case_id / 'wp-pz-tz_axt2_nnunet-702.nii.gz'))
+
+marksheet = read_input(PICAI_ROOT / 'clinical_information/marksheet.csv')
+assert marksheet[['patient_id', 'study_id']].notna().all().all()
+assert not marksheet.duplicated(['patient_id', 'study_id']).any(), 'Duplicate marksheet keys'
+rumc_manifest = read_input('configs/rumcnotprostatexnoclinical_folds.json', 'json')
+picai_manifest = read_input('configs/picai_test_clinical_folds.json', 'json')
+pooled_manifest = read_input('configs/pooled2_folds.json', 'json')
+for manifest in [rumc_manifest, picai_manifest, pooled_manifest]:
+    for fold, rows in manifest.items():
+        ids = [r['id'] for r in rows]
+        assert len(ids) == len(set(ids)), ('Duplicate manifest ID', fold)
+    excluded = {r['id'] for fold, rows in manifest.items() if fold.startswith('excluded') for r in rows}
+    testing = {r['id'] for fold, rows in manifest.items() if fold.startswith('testing') or fold == 'endorectal_coil' for r in rows}
+    assert not excluded & testing, 'Testing/exclusion manifest overlap'
+assert picai_manifest['training'] == rumc_manifest['training']
+index = read_input(DATA_ROOT / 'github/prostatex_masks/index.csv')
+assert index.ID.is_unique
+mapping = read_input(PICAI_ROOT / 'additional_resources/ProstateX-mapping.json', 'json')
+links = pd.DataFrame([(k.split('_')[0], v) for k, v in mapping.items()], columns=['ID', 'picai_key'])
+ambiguous = links.ID.duplicated(keep=False)
+links[['patient_id', 'study_id']] = links.picai_key.str.split('_', expand=True).astype('int64')
+linked = index.merge(links.loc[~ambiguous], on='ID', how='left', validate='one_to_one')
+linked = linked.merge(marksheet, on=['patient_id', 'study_id'], how='left', validate='many_to_one', indicator=True)
+linked['selected'] = linked.ID.isin([r['id'] for r in rumc_manifest['testing']])
+linked.to_csv(OUTPUT_DIR / 'prostatex_linkage_audit.csv', index=False)
+prostatex = linked.set_index('ID', drop=False).loc[[r['id'] for r in rumc_manifest['testing']]].copy()
+assert prostatex._merge.eq('both').all() and prostatex.patient_id.is_unique
+for entry, row in zip(rumc_manifest['testing'], prostatex.itertuples(index=False)):
+    assert (DATA_ROOT / entry['label']).resolve() == (DATA_ROOT / 'github/prostatex_masks' / row.label_wg).resolve(), row.ID
+    assert (DATA_ROOT / entry['image']).resolve() == (DATA_ROOT / 'github/prostatex_masks' / row.t2).resolve(), row.ID
+prostatex['reference_path'] = [str(DATA_ROOT / r['label']) for r in rumc_manifest['testing']]
+prostatex['image_path'] = [str(DATA_ROOT / r['image']) for r in rumc_manifest['testing']]
+prostatex['clinical_volume_ml'] = pd.to_numeric(prostatex.prostate_volume, errors='coerce')
+source_cases = {'prostatex': prostatex.reset_index(drop=True)}
+for site in SITES:
+    entries = pd.DataFrame(picai_manifest[f'testing_{site}']).rename(columns={'id': 'ID'})
+    assert entries.ID.is_unique and len(entries), site
+    entries[['patient_id', 'study_id']] = entries.ID.str.extract(r'^picai_(\d+)_(\d+)$').astype('int64')
+    cases = entries.merge(marksheet, on=['patient_id', 'study_id'], how='left', validate='one_to_one', indicator=True)
+    assert cases._merge.eq('both').all() and cases.center.eq(site).all() and cases.patient_id.is_unique, site
+    for manifest in [rumc_manifest, pooled_manifest]:
+        training = {int(r['id'].split('_')[1]) for r in manifest['training'] if r['id'].startswith('picai_')}
+        assert not set(cases.patient_id) & training, (site, 'Training patient overlap')
+    cases['reference_path'] = cases.label.map(lambda p: str(DATA_ROOT / p))
+    cases['image_path'] = cases.image.map(lambda p: str(DATA_ROOT / p))
+    for row in cases.itertuples(index=False):
+        assert Path(row.reference_path).parent == PICAI_ROOT / 'anatomical_delineations/whole_gland/AI/Bosma22b', row.ID
+        assert Path(row.reference_path).name == f'{row.patient_id}_{row.study_id}.nii.gz', row.ID
+    cases['clinical_volume_ml'] = pd.to_numeric(cases.prostate_volume, errors='coerce')
+    cases.to_csv(OUTPUT_DIR / f'picai_{site}_linkage_audit.csv', index=False)
+    source_cases[f'picai_{site}'] = cases
+source_cases['toronto'] = toronto_cases
+
+source_flow = []
+for stage, frame in [
+    ('Mapping examinations', links),
+    ('Local mask index', linked),
+    ('Unambiguous mapping and clinical match', linked.loc[linked._merge.eq('both')]),
+    ('Valid clinical volume', linked.loc[linked._merge.eq('both') &
+        pd.to_numeric(linked.prostate_volume, errors='coerce').gt(0) &
+        np.isfinite(pd.to_numeric(linked.prostate_volume, errors='coerce'))]),
+    ('Reviewed testing manifest', prostatex),
+]:
+    source_flow.append(dict(cohort='prostatex', stage=stage, n_examinations=len(frame),
+                            n_patients=frame.patient_id.nunique()))
+for dataset, manifest in [('picai', picai_manifest), ('multicenter', pooled_manifest)]:
+    for fold, rows in manifest.items():
+        source_flow.append(dict(cohort=dataset, stage=fold, n_examinations=len(rows),
+            n_patients=len({r['id'].split('_')[1] for r in rows}) if dataset == 'picai' else pd.NA))
+pd.DataFrame(source_flow).to_csv(OUTPUT_DIR / 'source_cohort_flow.csv', index=False)
 
 # %% [markdown]
-# ## Derive disjoint analysis cohorts from validated parent exports
+# ## Saved prediction provenance and native-grid measurements
 #
-# Subtract patients, not examination strings. Keep the parent measurements and
-# original configs intact. All following descriptive limits are calculated on
-# retained subsets; screening uses the fixed common ProstateX criteria. Namespace Dutch and Toronto patient identifiers because
-# their identifier systems are unrelated.
+# Volumes use foreground voxel count × |det(affine)| / 1,000 mL. DSC uses
+# matching grids (maximum corner displacement 0.5 mm), with no resampling.
+# Unknown Toronto units require an independently marked mm grid within 0.01 mm.
+# Empty predictions are retained. Manual Toronto has scalar references, no DSC.
+# Historical Toronto Dataset274 settings are unavailable and explicitly unverified;
+# all documented inference runs must match the five-fold study configuration.
 
 # %%
-parents = {key: value.copy() for key, value in cohorts.items()}
-parent_definitions = COHORTS.copy()
-parent_provenance = provenance
-# Validate parent disagreement flags before deriving subsets.
-for key, parent in parents.items():
-    site = key.split('_')[1] if key.startswith('picai') else 'RUMC'
-    saved = qi[site].loc[qi[site].cohort.eq('picai' if key.startswith('picai') else key)].set_index('ID').loc[parent.index]
-    parent_flags = []
-    for values, column in [(parent.clinical_volume_ml-parent.nnunet274_volume_ml, 'flag_absolute'),
-                           (200*(parent.clinical_volume_ml-parent.nnunet274_volume_ml)/(parent.clinical_volume_ml+parent.nnunet274_volume_ml), 'flag_relative')]:
-        flag = (values < values.mean()-1.96*values.std(ddof=1)) | (values > values.mean()+1.96*values.std(ddof=1))
-        assert np.array_equal(flag, saved[column])
-        parent_flags.append(flag)
-    assert np.array_equal(parent_flags[0] & parent_flags[1], saved.flag_both)
+# These helpers centralize spatial validation across every source cohort.
+def record_input(path):
+    path = Path(path)
+    key = str(path.relative_to(REPO_ROOT))
+    if key not in input_sha256:
+        with path.open('rb') as stream:
+            input_sha256[key] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return path
 
-subtractions = {
-    'picai_RUMC': ('prostatex', 'patient_id', 275, 'PI-CAI RUMC excluding ProstateX RUMC'),
-    'toronto_surrogate': ('toronto_manual', 'amrn', 3722, 'Toronto JDMI Additional'),
-}
+
+def validate_model(root, method, historical=False):
+    root = Path(root)
+    key = str(root.relative_to(REPO_ROOT))
+    if key in model_metadata:
+        return
+    bundle = REPO_ROOT / 'bundles' / MODEL_NAMES[method]
+    dataset = read_input(root / 'dataset.json', 'json')
+    plans = read_input(root / 'plans.json', 'json')
+    bundle_dataset = read_input(bundle / 'models/dataset.json', 'json')
+    assert dataset['labels'] == bundle_dataset['labels'] == {'background': 0, 'class1': 1}, root
+    assert plans['dataset_name'] == MODEL_NAMES[method].removesuffix('_3d_fullres_5fold'), root
+    metadata = dict(dataset=dataset, plans=plans, inference_verified=False)
+    config_path = root / 'inference_config.json'
+    if config_path.is_file():
+        config = read_input(config_path, 'json')
+        args = config['arguments']
+        assert config['folds'] == [0, 1, 2, 3, 4], root
+        assert args['tile_step_size'] == .8 and args['use_mirroring'] is False, root
+        assert args['use_gaussian'] is True and args['checkpoint_name'] == 'checkpoint_final.pt', root
+        assert Path(config['bundle_root']).resolve() == bundle.resolve(), root
+        metadata.update(inference_verified=True, inference_config=config)
+    else:
+        assert historical, f'Missing inference configuration: {root}'
+        metadata['inference_limitation'] = 'Historical Toronto Dataset274 settings unavailable; ensemble/settings unverified'
+    raw_args = root / 'predict_from_raw_data_args.json'
+    if raw_args.is_file():
+        metadata['raw_prediction_arguments'] = read_input(raw_args, 'json')
+    post_path = root / 'manual_postprocessing.json'
+    if not post_path.is_file():
+        post_path = root.parent / 'manual_postprocessing.json'
+    if post_path.is_file():
+        post = read_input(post_path, 'json')
+        assert post['status'] == 'complete' and post['processed_files'] == post['expected_files'], post_path
+        assert post['kwargs']['labels_or_regions'] == [1], post_path
+        audit_path = record_input(post_path.parent / post['audit'])
+        assert input_sha256[str(audit_path.relative_to(REPO_ROOT))] == post['audit_sha256'], post_path
+        post_audit = pd.read_csv(audit_path)
+        assert post_audit.file.is_unique and len(post_audit) == post['processed_files'], post_path
+        for row in post_audit.itertuples(index=False):
+            postprocessed_sha256[str((post_path.parent / row.file).relative_to(REPO_ROOT))] = row.after_sha256
+        metadata['manual_postprocessing'] = post
+    if method == 'rumcnotprostatexnoclinical236':
+        assert 'manual_postprocessing' in metadata, f'Missing Dataset236 postprocessing record: {root}'
+    model_metadata[key] = metadata
+
+
+def grid_displacement(first, second):
+    assert first.shape == second.shape, 'Grid shapes differ'
+    corners = np.array(list(product(*[(0, n-1) for n in first.shape])))
+    return float(np.linalg.norm(nib.affines.apply_affine(first.affine, corners)
+                               - nib.affines.apply_affine(second.affine, corners), axis=1).max())
+
+
+def measure_source(case, group, prediction_roots, scalar_reference=False):
+    paths = {'image': Path(case.image_path), **{m: r / f'{case.ID}.nii.gz' for m, r in prediction_roots.items()}}
+    if not scalar_reference:
+        paths['gt'] = Path(case.reference_path)
+    images, masks, result = {}, {}, {'ID': case.ID}
+    for method, path in paths.items():
+        record_input(path)
+        relative = str(path.relative_to(REPO_ROOT))
+        if relative in postprocessed_sha256:
+            assert input_sha256[relative] == postprocessed_sha256[relative], (case.ID, method, 'Postprocessed mask hash mismatch')
+        img = nib.load(path)
+        assert len(img.shape) == 3 and np.isfinite(img.affine).all(), (case.ID, method, 'Invalid 3D affine')
+        determinant = abs(float(np.linalg.det(img.affine[:3, :3])))
+        assert np.isfinite(determinant) and determinant > 0, (case.ID, method, 'Invalid voxel volume')
+        images[method] = img
+    for method, img in images.items():
+        assert img.shape == images['image'].shape, (case.ID, method, 'Image/mask grid shape mismatch')
+        displacement = grid_displacement(img, images['image'])
+        assert displacement <= GEOMETRY_TOLERANCE_MM, (case.ID, method, 'Image/mask displacement', displacement)
+        units = img.header.get_xyzt_units()[0]
+        anchor_path, anchor_displacement = '', 0.
+        if units == 'unknown' and group == 'toronto':
+            anchors = [(m, other) for m, other in images.items() if other.header.get_xyzt_units()[0] == 'mm'
+                       and grid_displacement(img, other) <= UNIT_ANCHOR_TOLERANCE_MM]
+            assert anchors, (case.ID, method, 'Unknown units lack a matching known-mm anchor')
+            anchor_method, anchor = anchors[0]
+            anchor_path = str(paths[anchor_method].relative_to(REPO_ROOT))
+            anchor_displacement = grid_displacement(img, anchor)
+        else:
+            assert units == 'mm', (case.ID, method, 'Spatial units must be mm')
+        if method == 'image':
+            continue
+        foreground = [1, 2, 3] if method == 'gt' and group == 'toronto' else [1]
+        data = np.asanyarray(img.dataobj)
+        assert np.isin(data, [0, *foreground]).all(), (case.ID, method, 'Unexpected labels')
+        mask = np.isin(data, foreground)
+        n = int(mask.sum())
+        if method == 'gt':
+            assert n > 0, (case.ID, 'Empty reference mask')
+        volume = n * abs(float(np.linalg.det(img.affine[:3, :3]))) / 1000
+        masks[method] = mask
+        result[f'{method}_volume_ml'] = volume
+        result[f'{method}_prediction_path'] = str(paths[method].relative_to(REPO_ROOT))
+        result[f'{method}_unit_anchor_path'] = anchor_path
+        result[f'{method}_unit_anchor_max_displacement_mm'] = anchor_displacement
+        measurement_rows.append(dict(cohort=group, ID=case.ID, method=method, path=str(paths[method].relative_to(REPO_ROOT)),
+            foreground_labels=str(foreground), voxel_count=n, volume_ml=volume, spatial_units=units,
+            unit_anchor_path=anchor_path, unit_anchor_max_displacement_mm=anchor_displacement,
+            image_max_corner_displacement_mm=displacement))
+    if scalar_reference:
+        result['gt_volume_ml'] = float(case.manual_reference_ml)
+        assert np.isfinite(result['gt_volume_ml']) and result['gt_volume_ml'] > 0, (case.ID, 'Invalid scalar reference')
+    for method in prediction_roots:
+        if scalar_reference:
+            result[f'{method}_dsc'] = np.nan
+        else:
+            displacement = grid_displacement(images[method], images['gt'])
+            assert displacement <= GEOMETRY_TOLERANCE_MM, (case.ID, method, 'Reference geometry mismatch', displacement)
+            result[f'{method}_dsc'] = 2 * int((masks[method] & masks['gt']).sum()) / (int(masks[method].sum()) + int(masks['gt'].sum()))
+    return result
+
+
+measured = {}
+for group, cases in source_cases.items():
+    assert np.isfinite(cases.clinical_volume_ml).all() and cases.clinical_volume_ml.gt(0).all(), (group, 'Invalid clinical volume')
+    roots = {method: (TORONTO_ROOT / f'seg_out_{name}' if group == 'toronto' else
+             STUDY_ROOT / name / ('prostatex_original_train_mapped' if group == 'prostatex' else 'picai_test_clinical'))
+             for method, name in MODEL_NAMES.items()}
+    for method, root in roots.items():
+        validate_model(root, method, historical=(group == 'toronto' and method == 'nnunet274'))
+    records = []
+    for i, case in enumerate(cases.itertuples(index=False), 1):
+        records.append(measure_source(case, group, roots, scalar_reference=(group == 'toronto' and case.has_manual_reference)))
+        if i % 100 == 0 or i == len(cases):
+            print(f'Measured {group}: {i}/{len(cases)}', flush=True)
+    measured[group] = cases.merge(pd.DataFrame(records), on='ID', validate='one_to_one')
+
+# Multicenter testing and ERC cohorts have masks and no clinical comparator.
+multicenter_metrics = []
+for split, folder, label in [('testing', 'pooled2_test', 'Multicenter Data (external coil)'),
+                             ('endorectal_coil', 'pooled2_endorectal_coil', 'Multicenter Data (ERC)')]:
+    entries = pd.DataFrame(pooled_manifest[split]).rename(columns={'id': 'ID'})
+    assert entries.ID.is_unique and len(entries), split
+    entries['image_path'] = entries.image.map(lambda p: str(DATA_ROOT / p))
+    entries['reference_path'] = entries.label.map(lambda p: str(DATA_ROOT / p))
+    roots = {m: STUDY_ROOT / name / folder for m, name in MODEL_NAMES.items()}
+    for method, root in roots.items():
+        validate_model(root, method)
+    for case in entries.itertuples(index=False):
+        result = measure_source(case, split, roots)
+        for method in roots:
+            multicenter_metrics.append(dict(cohort=label, ID=case.ID, method=method,
+                gt_volume_ml=result['gt_volume_ml'], predicted_volume_ml=result[f'{method}_volume_ml'], dsc=result[f'{method}_dsc']))
+multicenter_metrics = pd.DataFrame(multicenter_metrics)
+multicenter_metrics.to_csv(OUTPUT_DIR / 'multicenter_metrics_per_case.csv', index=False)
+pd.DataFrame(measurement_rows).to_csv(OUTPUT_DIR / 'mask_measurement_audit.csv', index=False)
+for group, cases in measured.items():
+    cases.to_csv(OUTPUT_DIR / f'{group}_measured_volumes.csv', index=False)
+
+# %% [markdown]
+# ## Toronto clinical workbook linkage
+#
+# The original workbook is read directly. If encrypted, enter its password at
+# the terminal/notebook prompt. The password and decrypted bytes are never saved.
+# Reader-zero handling, decimal commas, censored PSA, and the documented PSA
+# correction follow the source definitions; no precomputed clinical audit is used.
+
+# %%
+from getpass import getpass
+from io import BytesIO
+import msoffcrypto
+
+workbook_path = record_input(TORONTO_ROOT / 'PROSATELLMVOL20260703-12-WorkingBillShi.xlsx')
+with workbook_path.open('rb') as stream:
+    office = msoffcrypto.OfficeFile(stream)
+    try:
+        if office.is_encrypted():
+            password = getpass('Toronto Excel password: ')
+            try:
+                office.load_key(password=password, verify_password=True)
+            finally:
+                del password
+            with BytesIO() as decrypted:
+                office.decrypt(decrypted)
+                decrypted.seek(0)
+                workbook = pd.read_excel(decrypted, engine='openpyxl', dtype=object, keep_default_na=False)
+        else:
+            workbook = pd.read_excel(workbook_path, engine='openpyxl', dtype=object, keep_default_na=False)
+    finally:
+        del office
+READER_FIELDS = ['p_axt2_ch_vol', 'p_axt2_ah_vol', 'p_axt2_dd_vol', 'p_axt2_ao_vol',
+                 'p_axt2_chepg_vol', 'p_axt2_epgch_vol', 'p_axt2_epg_vol']
+fields = ['aano', 'amrn', 'psa_report_ref', 'psa', 'reportmaxpirads_ref', 'CSCANCER', *READER_FIELDS]
+assert workbook.columns.is_unique and set(fields) <= set(workbook), 'Workbook lacks required clinical fields'
+clinical = workbook[fields].copy()
+clinical['source_excel_row'] = np.arange(2, len(clinical)+2)
+clinical['aano'] = clinical.aano.astype('string').str.strip()
+clinical['workbook_amrn'] = clinical.pop('amrn').astype('string').str.strip().str.removeprefix('AIPR_')
+assert clinical.aano.notna().all() and clinical.aano.ne('').all() and clinical.aano.is_unique, 'Invalid workbook accession keys'
+clinical = measured['toronto'].merge(clinical, on='aano', how='left', validate='one_to_one', indicator='workbook_match')
+assert clinical.workbook_match.eq('both').all() and clinical.amrn.eq(clinical.workbook_amrn).all(), 'Workbook linkage mismatch'
+for field in ['psa_report_ref', 'psa', 'reportmaxpirads_ref', *READER_FIELDS]:
+    raw = clinical[field].astype('string')
+    clinical[f'{field}_censored'] = raw.str.contains('>', regex=False, na=False)
+    clinical[f'{field}_numeric'] = pd.to_numeric(raw.str.replace(',', '.', regex=False).str.replace('>', '', regex=False), errors='coerce').astype(float)
+clinical['psa_correction_applied'] = clinical.aano.eq('333abfe652a8889')
+alternative = clinical.psa_numeric.mask(clinical.psa_correction_applied, 28.9)
+reported = clinical.psa_report_ref_numeric
+valid_report = np.isfinite(reported) & reported.gt(0)
+valid_alternative = np.isfinite(alternative) & alternative.gt(0)
+clinical['psa_ng_ml'] = reported.where(valid_report, alternative.where(valid_alternative))
+clinical['psa_source'] = np.select([valid_report, valid_alternative], ['psa_report_ref', 'psa'], default='unavailable')
+clinical['psa_selected_censored'] = np.where(valid_report, clinical.psa_report_ref_censored,
+    clinical.psa_censored & ~clinical.psa_correction_applied & valid_alternative)
+pirads = clinical.reportmaxpirads_ref_numeric
+clinical['pirads_3'] = (np.isfinite(pirads) & pirads.eq(3))
+status = clinical.CSCANCER.astype('string').str.strip().str.upper()
+missing = status.isin(['', 'NA', 'N/A', '#N/A', '#NA', 'NAN', 'NONE', 'NULL', '<NA>', 'UNKNOWN',
+                     'NOT AVAILABLE', 'NOT KNOWN', 'NOT BIOPSIED', 'NO BIOPSY'])
+initial = status.mask(missing).str[0]
+clinical['outcome'] = initial.where(initial.isin(['Y', 'N']))
+clinical['outcome_known'] = clinical.outcome.notna()
+clinical['outcome_definition'] = 'CSCANCER (Y/N)'
+readers = clinical[[f'{f}_numeric' for f in READER_FIELDS]].copy()
+readers.loc[readers.p_axt2_ch_vol_numeric.eq(0), 'p_axt2_ch_vol_numeric'] = np.nan
+clinical['invalid_reader_volume'] = (readers.notna() & (~np.isfinite(readers) | readers.le(0))).any(axis=1)
+clinical['workbook_reference_volume_ml'] = readers.median(axis=1)
+assert not clinical.invalid_reader_volume.any(), 'Invalid reader volume'
+assert np.isclose(clinical.workbook_reference_volume_ml, clinical.manual_reference_ml, equal_nan=True, rtol=1e-9, atol=1e-9).all(), 'Workbook/listing manual reference mismatch'
+clinical.to_csv(OUTPUT_DIR / 'toronto_clinical_linkage_audit.csv', index=False)
+
+# %% [markdown]
+# ## Independent analysis cohorts and secondary endpoints
+#
+# Remove ProstateX patients from PI-CAI RUMC. Toronto manual and Additional are
+# already disjoint by source reference availability. No endpoint-specific missing
+# data removes patients from volume analysis. Namespace unrelated patient IDs.
+
+# %%
+cohorts = {key: measured[key].copy() for key in COHORTS if key in measured}
+cohorts['toronto_manual'] = clinical.loc[clinical.has_manual_reference].copy()
+cohorts['toronto_surrogate'] = clinical.loc[~clinical.has_manual_reference].copy()
+shared_patients = {site: len(set(cohorts[f'picai_{site}'].patient_id) & set(cohorts['prostatex'].patient_id)) for site in SITES}
 membership_tables, provenance = [], []
-for key, parent in parents.items():
+for key in COHORTS:
+    v = cohorts[key]
     patient_column = 'amrn' if key.startswith('toronto') else 'patient_id'
-    removed = pd.Series(False, index=parent.index)
-    rule = 'Full validated parent cohort'
-    if key in subtractions:
-        subtract_key, patient_column, expected, name = subtractions[key]
-        removed = parent[patient_column].isin(parents[subtract_key][patient_column])
-        rule = f'Parent minus {subtract_key}, matched by {patient_column}'
-        directory, _, _, reference = COHORTS[key]
-        COHORTS[key] = (directory, name, expected, reference)
-    retained = parent.loc[~removed].copy()
-    assert len(retained) == COHORTS[key][2]
-    assert retained[patient_column].notna().all() and retained[patient_column].is_unique
-    assert set(retained.index).isdisjoint(parent.index[removed])
-    assert set(retained.index) | set(parent.index[removed]) == set(parent.index)
-    cohorts[key] = retained
-    membership = pd.DataFrame({'cohort': key, 'ID': parent.ID, 'patient_identifier': parent[patient_column],
-                               'selected': ~removed, 'selection_rule': rule})
-    membership_tables.append(membership)
-    provenance.append(dict(cohort=key, name=COHORTS[key][1], n=len(retained), reference=COHORTS[key][3],
-                           parent_n=len(parent), parent_cohort_sha256=hashlib.sha256('\n'.join(sorted(parent.index)).encode()).hexdigest(),
-                           cohort_sha256=hashlib.sha256('\n'.join(sorted(retained.index)).encode()).hexdigest(),
-                           removed_n=int(removed.sum()), selection_rule=rule))
+    removed = v.patient_id.isin(cohorts['prostatex'].patient_id) if key == 'picai_RUMC' else pd.Series(False, index=v.index)
+    membership_tables.append(pd.DataFrame({'cohort': key, 'ID': v.ID, 'patient_identifier': v[patient_column],
+        'selected': ~removed, 'selection_rule': 'Remove ProstateX patients' if key == 'picai_RUMC' else 'Source selection'}))
+    v = v.loc[~removed].set_index('ID', drop=False).copy()
+    assert len(v) and v.index.is_unique and v[patient_column].notna().all() and v[patient_column].is_unique, key
+    for method in ['gt', *METHODS]:
+        values = v[f'{method}_volume_ml']
+        assert np.isfinite(values).all() and values.ge(0).all(), (key, method)
+    assert v.gt_volume_ml.gt(0).all() and v.clinical_volume_ml.gt(0).all(), key
+    if not key.startswith('toronto'):
+        v['psa_ng_ml'] = pd.to_numeric(v.psa, errors='coerce')
+        maximum_pirads = []
+        for case in v.itertuples(index=False):
+            scores = []
+            for token in ([] if pd.isna(case.lesion_PIRADS) else str(case.lesion_PIRADS).split(',')):
+                if token.strip().upper() in ('', 'N/A'):
+                    continue
+                score = float(token)
+                assert score in [1, 2, 3, 4, 5], (case.ID, 'Invalid PI-RADS token', token)
+                scores.append(score)
+            maximum_pirads.append(max(scores) if scores else np.nan)
+        v['pirads_3'] = np.array(maximum_pirads) == 3
+        outcome = pd.to_numeric(v.case_ISUP, errors='coerce')
+        v['outcome_known'] = np.isfinite(outcome) & outcome.isin([0, 1, 2, 3, 4, 5])
+        v['outcome'] = outcome.where(v.outcome_known)
+        v['outcome_definition'] = 'ISUP grade group (csPCa ≥2)'
+    for method in ['gt', 'clinical', 'nnunet274']:
+        v[f'{method}_psad'] = v.psa_ng_ml.where(np.isfinite(v.psa_ng_ml) & v.psa_ng_ml.gt(0)) / v[f'{method}_volume_ml'].where(v[f'{method}_volume_ml'].gt(0))
+    v['psad_evaluable'] = v.psa_ng_ml.gt(0) & np.isfinite(v[['gt_psad', 'clinical_psad', 'nnunet274_psad']]).all(axis=1)
+    v.loc[~v.outcome_known, 'outcome'] = pd.NA
+    cohorts[key] = v
+    _, name, _, reference = COHORTS[key]
+    COHORTS[key] = ('', name, len(v), reference)
+    provenance.append(dict(cohort=key, name=name, n=len(v), reference=reference,
+        cohort_sha256=hashlib.sha256('\n'.join(sorted(v.index)).encode()).hexdigest(), removed_n=int(removed.sum())))
+cohorts = {key: cohorts[key] for key in COHORTS}
 membership = pd.concat(membership_tables, ignore_index=True)
 membership.to_csv(OUTPUT_DIR / 'analysis_membership.csv', index=False)
 membership.loc[membership.selected].to_csv(OUTPUT_DIR / 'selected_membership.csv', index=False)
 membership.loc[~membership.selected].to_csv(OUTPUT_DIR / 'removed_membership.csv', index=False)
-patient_sets = {}
-for key, v in cohorts.items():
-    if key.startswith('toronto'):
-        patient_sets[key] = {('Toronto', str(value)) for value in v.amrn}
-    else:
-        patient_sets[key] = {('Dutch', str(int(value))) for value in v.patient_id}
+patient_sets = {key: {(('Toronto' if key.startswith('toronto') else 'Dutch'), str(int(value)))
+                     for value in v['amrn' if key.startswith('toronto') else 'patient_id']}
+                for key, v in cohorts.items()}
 for first, second in combinations(patient_sets, 2):
-    assert patient_sets[first].isdisjoint(patient_sets[second]), (first, second, 'shared analysis patients')
-print('Disjoint analysis cohorts:', {key: len(v) for key, v in cohorts.items()})
+    assert patient_sets[first].isdisjoint(patient_sets[second]), (first, second, 'Shared analysis patients')
+assert set(cohorts['toronto_manual'].index) | set(cohorts['toronto_surrogate'].index) == set(toronto_cases.ID)
+assert not set(clinical.aano) & set(reasons.index)
+print('Disjoint analysis cohorts:', {k: len(v) for k, v in cohorts.items()}, flush=True)
+for key, v in cohorts.items():
+    v.to_csv(OUTPUT_DIR / f'{key}_comparator_volumes.csv', index=False)
+toronto_seg = pd.DataFrame([dict(ID=case.ID, method=method, dsc=getattr(case, f'{method}_dsc'))
+    for case in cohorts['toronto_surrogate'].itertuples(index=False) for method in MODEL_NAMES])
+toronto_seg.to_csv(OUTPUT_DIR / 'toronto_additional_segmentation_metrics_per_case.csv', index=False)
+toronto_seg.groupby('method').agg(n=('ID', 'size'), mean_dsc=('dsc', 'mean'),
+    zero_overlap_cases=('dsc', lambda x: int(x.eq(0).sum()))).to_csv(OUTPUT_DIR / 'toronto_additional_segmentation_summary.csv')
 
 # %% [markdown]
 # ## Tables 1–3: testing performance
 #
-# Volumes are in mL. Percentage errors divide by the reference volume.
-# Toronto manual references are scalar planimetry, so DSC is unavailable.
-# Expanded Toronto uses saved scalar volumes here; no DSC is inferred from
-# volume agreement. PI-CAI DSC is agreement with an automated surrogate.
+# Volumes are in mL; percentage errors divide by reference volume. Toronto
+# manual DSC is unavailable. Toronto Additional and PI-CAI use surrogate masks.
 
 # %%
-performance_root = 'results/20261105_tile0.8_nomirroring/tables'
-check_record(read_input(f'{performance_root}/run_metadata.json', 'json'))
-metrics = read_input(f'{performance_root}/per_case_metrics.csv')
 performance_rows = []
-for split, label, n in [('testing', 'Multicenter Data (external coil)', 22), ('endorectal_coil', 'Multicenter Data (ERC)', 13)]:
-    for model, method in [('Dataset274_raw_3d_fullres_5fold', 'nnunet274'), ('Dataset236_raw_3d_fullres_5fold', 'rumcnotprostatexnoclinical236')]:
-        selected = metrics.loc[metrics.dataset.eq('pooled2') & metrics.split.eq(split) & metrics.model.eq(model) & metrics.region.eq('whole_gland')]
-        assert len(selected) == n and selected.case_id.is_unique and selected.status.eq('evaluated').all()
-        error = selected.predicted_volume_ml.to_numpy() - selected.reference_volume_ml.to_numpy()
-        percent = 100 * error / selected.reference_volume_ml.to_numpy()
-        performance_rows.append(dict(cohort=label, n=n, method=method, dsc=selected.dsc.mean(), mae=np.abs(error).mean(), rmse=np.sqrt(np.mean(error**2)), mape=np.abs(percent).mean(), rmspe=np.sqrt(np.mean(percent**2))))
+for (label, method), selected in multicenter_metrics.groupby(['cohort', 'method'], sort=False):
+    error = selected.predicted_volume_ml - selected.gt_volume_ml
+    percent = 100 * error / selected.gt_volume_ml
+    performance_rows.append(dict(cohort=label, n=len(selected), method=method, dsc=selected.dsc.mean(),
+        mae=error.abs().mean(), rmse=np.sqrt(np.mean(error**2)), mape=percent.abs().mean(), rmspe=np.sqrt(np.mean(percent**2))))
 for key, v in cohorts.items():
-    directory, name, n, reference = COHORTS[key]
-    dsc = {}
-    if key.startswith('picai'):
-        root = f'results/{directory}'
-        seg_meta = read_input(f'{root}/segmentation_run_metadata.json', 'json')
-        check_record(seg_meta)
-        assert seg_meta['cohort_sha256'] == hashlib.sha256('\n'.join(sorted(parents[key].index)).encode()).hexdigest()
-        seg = read_input(f'{root}/segmentation_metrics_per_case.csv')
-        for method in ['nnunet274', 'rumcnotprostatexnoclinical236']:
-            part = seg.loc[seg.method.eq(method)]
-            assert part.ID.is_unique and set(part.ID) == set(parents[key].index)
-            part = part.loc[part.ID.isin(v.index)]
-            assert len(part) == n and part.ID.is_unique and set(part.ID) == set(v.index)
-            assert part.dsc.between(0, 1).all()
-            dsc[method] = part.dsc.mean()
-    elif key == 'prostatex':
-        for model, method in [('Dataset274_raw_3d_fullres_5fold', 'nnunet274'), ('Dataset236_raw_3d_fullres_5fold', 'rumcnotprostatexnoclinical236')]:
-            part = metrics.loc[metrics.dataset.eq('rumcnotprostatexnoclinical') & metrics.split.eq('testing') & metrics.model.eq(model) & metrics.region.eq('whole_gland')].set_index('case_id')
-            assert len(part) == n and part.index.is_unique and set(part.index) == set(v.index)
-            assert np.allclose(part.predicted_volume_ml, v.loc[part.index, f'{method}_volume_ml'])
-            assert np.allclose(part.reference_volume_ml, v.loc[part.index, 'gt_volume_ml'])
-            dsc[method] = part.dsc.mean()
+    _, name, n, reference = COHORTS[key]
     for method in METHODS:
-        error = (v[f'{method}_volume_ml'] - v.gt_volume_ml).to_numpy()
-        percent = 100 * error / v.gt_volume_ml.to_numpy()
-        performance_rows.append(dict(cohort=name, n=n, method=method, dsc=dsc.get(method, np.nan), mae=np.abs(error).mean(), rmse=np.sqrt(np.mean(error**2)), mape=np.abs(percent).mean(), rmspe=np.sqrt(np.mean(percent**2))))
+        error = v[f'{method}_volume_ml'] - v.gt_volume_ml
+        percent = 100 * error / v.gt_volume_ml
+        performance_rows.append(dict(cohort=name, n=n, method=method,
+            dsc=v[f'{method}_dsc'].mean() if method != 'clinical' else np.nan,
+            mae=error.abs().mean(), rmse=np.sqrt(np.mean(error**2)), mape=percent.abs().mean(), rmspe=np.sqrt(np.mean(percent**2))))
 performance = pd.DataFrame(performance_rows)
-# Independently reconcile all four volume endpoints to saved source summaries.
-for key, (directory, name, n, reference) in COHORTS.items():
-    summary = read_input(f'results/{directory}/comparator_summary.csv').set_index('method')
-    for method in METHODS:
-        # Source summaries describe the full parents, not the derived subsets.
-        parent = parents[key]
-        error = parent[f'{method}_volume_ml'] - parent.gt_volume_ml
-        percent = 100 * error / parent.gt_volume_ml
-        row = dict(mae=np.abs(error).mean(), rmse=np.sqrt(np.mean(error**2)),
-                   mape=np.abs(percent).mean(), rmspe=np.sqrt(np.mean(percent**2)))
-        assert summary.loc[method, 'n'] == len(parent)
-        for metric, saved_column in [('mae', 'mae_ml'), ('rmse', 'rmse_ml'), ('mape', 'mean_absolute_percentage_error'), ('rmspe', 'rmspe_percent')]:
-            assert np.isclose(row[metric], summary.loc[method, saved_column], rtol=0, atol=1e-9), (key, method, metric)
 performance.to_csv(OUTPUT_DIR / 'performance.csv', index=False)
 tables = {}
 for number, fields in [(1, ['dsc']), (2, ['mae', 'rmse']), (3, ['mape', 'rmspe'])]:
@@ -388,13 +606,6 @@ for key, v in cohorts.items():
     assert np.array_equal(v.flag_both, v.flag_absolute & v.flag_relative)
     threshold['n_both'] = int(v.flag_both.sum())
     threshold_rows.append(threshold)
-    site = key.split('_')[1] if key.startswith('picai') else 'RUMC'
-    old_key = 'picai' if key.startswith('picai') else key
-    saved = qi[site].loc[qi[site].cohort.eq(old_key)].set_index('ID').loc[v.index]
-    for column in ['gt_volume_ml', 'clinical_volume_ml', 'nnunet274_volume_ml', 'disagreement_ml', 'disagreement_percent']:
-        assert np.allclose(v[column], saved[column], rtol=0, atol=1e-10)
-    for column in ['psad_evaluable', 'pirads_3', 'outcome_known']:
-        assert np.array_equal(v[column], saved[column]), (key, column)
     flagged = v.loc[v.flag_both].copy()
     manual_error = np.abs(flagged.clinical_volume_ml - flagged.gt_volume_ml)
     auto_error = np.abs(flagged.nnunet274_volume_ml - flagged.gt_volume_ml)
@@ -446,6 +657,11 @@ biopsy_cases = biopsy_cases.assign(
 
 # Save compact case audits without copying private source paths/workbook columns.
 case_columns = ['cohort', 'ID', 'reference', 'gt_volume_ml', 'clinical_volume_ml', 'nnunet274_volume_ml', 'disagreement_ml', 'disagreement_percent', 'flag_absolute', 'flag_relative', 'flag_both', 'psa_ng_ml', 'gt_psad', 'clinical_psad', 'nnunet274_psad', 'psad_evaluable', 'pirads_3', 'outcome_known', 'outcome', 'outcome_definition']
+all_cases['improvement_ml'] = ((all_cases.clinical_volume_ml - all_cases.gt_volume_ml).abs()
+                               - (all_cases.nnunet274_volume_ml - all_cases.gt_volume_ml).abs())
+for key in COHORTS:
+    all_cases.loc[all_cases.cohort.eq(key) & all_cases.flag_both, case_columns + ['improvement_ml']].sort_values(
+        ['improvement_ml', 'ID']).to_csv(OUTPUT_DIR / f'{key}_disagreement_cases.csv', index=False)
 all_cases[case_columns].to_csv(OUTPUT_DIR / 'case_audit.csv', index=False)
 biopsy_cases[case_columns + ['gt_recommend', 'clinical_recommend', 'nnunet274_recommend']].to_csv(OUTPUT_DIR / 'pirads3_outliers.csv', index=False)
 for stem, frame in [('disagreement_thresholds', thresholds), ('volume_closeness', volume_summary), ('psad_closeness', psad_summary)]:
@@ -497,7 +713,6 @@ for key, percentage_limit in [('prostatex', 90), ('toronto_manual', 100)]:
     v = cohorts[key]
     reference = v.gt_volume_ml.to_numpy()
     selected = v.flag_both.to_numpy()
-    assert selected.sum() == {'prostatex': 2, 'toronto_manual': 10}[key]
     assert np.array_equal(selected, outside_both_common(v.disagreement_ml, v.disagreement_percent, COMMON_LIMITS))
     agreement_members.append(v[['ID', 'flag_both', 'disagreement_ml', 'disagreement_percent']].assign(cohort=key))
     names = ['Manual ellipsoid', 'Multicenter', 'Single-center']
@@ -734,20 +949,21 @@ for key in COHORTS:
                               unknown_outcomes=int((~selected.outcome_known).sum()),
                               recommendations_changed=int(changed.sum())))
 pd.DataFrame(biopsy_counts).to_csv(OUTPUT_DIR / 'pirads3_counts.csv', index=False)
-assert thresholds.set_index('cohort').n_both.to_dict() == {
-    'prostatex': 2, 'toronto_manual': 10, 'picai_RUMC': 11,
-    'toronto_surrogate': 143, 'picai_ZGT': 7, 'picai_PCNN': 60,
-}
+assert thresholds.set_index('cohort').n_both.to_dict() == all_cases.groupby('cohort').flag_both.sum().to_dict()
 assert plot_summary.groupby('cohort', sort=False).common_both_n.first().tolist() == thresholds.n_both.tolist()
 metadata = dict(manual_reference_agreement=agreement_settings, screening=dict(calibration_cohort='ProstateX RUMC', common_limits=COMMON_LIMITS,
                                rule='strictly outside both absolute and relative intervals; equality retained',
-                               relative_denominator='pair mean', threshold_uncertainty_in_tests=False), created_utc=datetime.now(timezone.utc).isoformat(), cohorts=provenance, parent_cohorts=parent_provenance,
-                input_sha256=input_sha256, provenance_reviews=provenance_reviews, source_notebook_sha256=hashlib.sha256((REPO_ROOT / 'notebooks/paper_new_results.py').read_bytes()).hexdigest(),
-                parent_shared_picai_prostatex_patients=shared_patients, analysis_cohorts_patient_disjoint=True, toronto_selection='Additional 3722 = archived 4105 minus manual 383; current exclusions not substituted',
+                               relative_denominator='pair mean', threshold_uncertainty_in_tests=False), created_utc=datetime.now(timezone.utc).isoformat(), cohorts=provenance,
+                input_sha256=input_sha256, model_metadata=model_metadata,
+                geometry_tolerance_mm=GEOMETRY_TOLERANCE_MM, unknown_unit_anchor_tolerance_mm=UNIT_ANCHOR_TOLERANCE_MM,
+                toronto_flow=flow.to_dict('records'),
+                unmatched_toronto_exclusions=exclusion_audit.loc[~exclusion_audit.matched_source, 'aano'].tolist(), source_notebook_sha256=SOURCE_NOTEBOOK_SHA256,
+                parent_shared_picai_prostatex_patients=shared_patients, analysis_cohorts_patient_disjoint=True, toronto_selection='Current exclude.json applied to source CSV; eligible positive manual references form Manual; remaining eligible patients form Additional',
                 bland_altman=dict(xscale='log', xticks=[10, 30, 100, 300], xlim=BA_XLIM, ylim=BA_YLIM, relative_ylim=BA_REL_YLIM, layout='6x2', page_inches=[8.5, 9.75], common_plot_limits=COMMON_LIMITS, common_criteria_applied_to_analysis=True, highlight=dict(color='#D55E00', edgecolor='white', alpha=1., size=4, criterion='strictly outside both common intervals'), sign='clinical ellipsoid minus multicenter model', statistics_use_all_cases=True),
                 tests='two-sided exact binomial p=0.5, non-ties only',
                 correction='Holm across six cohorts separately for volume and ordinal PSAD closeness; undefined slots use p=1 then remain undefined',
-                error_change='automated minus manual', validation='All assertions passed')
+                error_change='automated minus manual', disagreement_case_improvement='absolute clinical error minus absolute multicenter error (mL); positive improves',
+                validation='All assertions passed')
 (OUTPUT_DIR / 'run_metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
 if UPDATE_MANUSCRIPT:
     manuscript_path = REPO_ROOT / 'paper_new.md'

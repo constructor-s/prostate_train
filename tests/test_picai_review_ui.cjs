@@ -28,7 +28,7 @@ const fetch = async (url, options = {}) => {
   const index = body.target_id !== undefined ? Number(body.target_id) : body.target ?? 10;
   return response({index, total: 880, ID: String(index), center: 'RUMC',
     panels: Array.from({length: 9}, (_, p) => `/api/image/g/${index}/${p}/50.png`),
-    rating: 'unreviewed', note: '', shape: [100, 100, 100], spacing: [2, 3, 4], cursor: [50, 50, 50]});
+    rating: 'unreviewed', note: '', shape: [100, 100, 100], spacing: [2, 3, 4], volumes_ml: [index + 42.34, 0, 30.56], cursor: [50, 50, 50]});
 };
 class Image { set src(value) {
   assert(!value.startsWith('data:')); imageURLs.push(value);
@@ -52,10 +52,14 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 80));
 const completeImages = () => heldImages.splice(0).forEach(complete => complete());
 const wheel = deltaY => elements.grid.children[0].children[0].events.wheel({deltaY, preventDefault() {}});
 const key = (target, value) => handlers.keydown({target, key: value, preventDefault() {}});
+const labels = () => elements.grid.children.map(panel => panel.children[1].textContent);
 const view = () => vm.runInContext('JSON.stringify({index, info, displayedCursor})', context);
 (async () => {
   await pause(); assert.deepEqual(requests, ['/api/navigate']); assert.equal(saved.length, 0);
   assert.equal(elements.url, '/case/1'); // Explicit URL overrides resume at case 11.
+  assert.deepEqual(labels().slice(0, 3), ['Axial · Bosma22b · Vol = 42.3 mL',
+    'Axial · Multicenter Dataset274 · Vol = 0.0 mL', 'Axial · RUMC Dataset236 · Vol = 30.6 mL']);
+  assert(labels().slice(3).every(label => !label.includes('Vol =')));
   const initial = imageURLs.slice(); holdImages = true;
   const initialView = view(), initialDraws = drawCount;
   wheel(1); await pause(); assert.equal(heldImages.length, 9);
@@ -94,8 +98,10 @@ const view = () => vm.runInContext('JSON.stringify({index, info, displayedCursor
   await context.navigate(879); assert.equal(elements.next.textContent, 'Finish ✓');
   elements.next.onclick(); await pause(); assert.equal(elements.status.textContent, 'Saved. Review finished.');
   assert.equal(saved.at(-1).index, 879); holdImages = true;
+  const oldLabels = labels();
   const oldView = view(), oldTitle = elements.title.textContent, oldDraws = drawCount;
   const navigation = context.navigate(2); await pause();
+  assert.deepEqual(labels(), oldLabels);
   assert.equal(view(), oldView); assert.equal(elements.title.textContent, oldTitle);
   assert.equal(elements.next.disabled, true); assert.equal(heldImages.length, 9);
   assert.equal(elements.status.textContent, 'Loading…');
@@ -107,14 +113,18 @@ const view = () => vm.runInContext('JSON.stringify({index, info, displayedCursor
   completeImages(); await navigation;
   assert.equal(elements.url, '/case/3'); assert.equal(drawCount, oldDraws + 9);
   assert.equal(elements.next.disabled, false);
+  assert.equal(labels()[0], 'Axial · Bosma22b · Vol = 44.3 mL');
+  const readyLabels = labels();
   const readyView = view(), readyDraws = drawCount;
   const failedNavigation = context.navigate(3); await pause();
   heldImages.shift()(true); completeImages(); await failedNavigation;
+  assert.deepEqual(labels(), readyLabels);
   assert.equal(view(), readyView); assert.equal(drawCount, readyDraws);
   assert.equal(elements.url, '/case/3'); assert.equal(elements.next.disabled, false);
   assert(elements.status.textContent.includes('PNG loading failed'));
   wheel(1); await pause();
   heldImages.shift()(true); completeImages(); await pause();
+  assert.deepEqual(labels(), readyLabels);
   assert.equal(view(), readyView); assert.equal(drawCount, readyDraws);
   assert(elements.status.textContent.includes('Image error'));
   holdImages = false;

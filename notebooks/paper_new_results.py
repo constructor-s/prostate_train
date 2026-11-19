@@ -575,7 +575,9 @@ for number, fields in [(1, ['dsc']), (2, ['mae', 'rmse']), (3, ['mape', 'rmspe']
             row[title] = '; '.join(f'{x:.3f}' if number == 1 else f'{x:.2f}' for x in values) if values.notna().all() else '—'
         rows.append(row)
     tables[number] = pd.DataFrame(rows)
-    if number in (2, 3):
+    if number == 1:
+        tables[number] = tables[number][['Dataset', 'Multicenter', 'Single-center']]
+    elif number in (2, 3):
         tables[number] = tables[number][['Dataset', 'Clinical ellipsoid', 'Multicenter', 'Single-center']]
 
 def outside_both_common(difference, relative, limits):
@@ -632,7 +634,7 @@ for key, v in cohorts.items():
     manual_distance = (eligible.clinical_category - eligible.gt_category).abs()
     auto_distance = (eligible.nnunet274_category - eligible.gt_category).abs()
     wins, losses, ties = int((auto_distance < manual_distance).sum()), int((auto_distance > manual_distance).sum()), int((auto_distance == manual_distance).sum())
-    psad_rows.append(dict(cohort=key, name=name, n_flagged=len(flagged), n=len(eligible), excluded_psad=len(flagged)-len(eligible), wins=wins, losses=losses, ties=ties, p_raw=exact_closer_p(wins, losses)))
+    psad_rows.append(dict(cohort=key, name=name, n_flagged=len(flagged), n=len(eligible), excluded_psad=len(flagged)-len(eligible), wins=wins, losses=losses, ties=ties, crossed_down=int((eligible.clinical_psad.ge(.15) & eligible.nnunet274_psad.lt(.15)).sum()), crossed_up=int((eligible.clinical_psad.lt(.15) & eligible.nnunet274_psad.ge(.15)).sum()), p_raw=exact_closer_p(wins, losses)))
     # Include every PI-RADS 3 intersection case even if PSA/outcome is missing.
     biopsy = flagged.loc[flagged.pirads_3].copy()
     for method in ['gt', 'clinical', 'nnunet274']:
@@ -687,7 +689,7 @@ for r in volume_summary.to_dict('records'):
     row['Adjusted p'] = fmt_p(r['p_holm'])
     rows.append(row)
 tables[4] = pd.DataFrame(rows)
-tables[5] = pd.DataFrame([{'Dataset': f'{r.name} (n = {r.n}' + (', another missing PSA value' if r.excluded_psad == 1 else f', {r.excluded_psad} missing PSA values' if r.excluded_psad else '') + ')', 'Automated closer': r.wins, 'Equal distance': r.ties, 'Manual closer': r.losses, 'Adjusted p': fmt_p(r.p_holm)} for r in psad_summary.itertuples()])
+tables[5] = pd.DataFrame([{'Dataset': f'{r.name} (n = {r.n}' + (', another missing PSA value' if r.excluded_psad == 1 else f', {r.excluded_psad} missing PSA values' if r.excluded_psad else '') + ')', 'Automated closer': r.wins, 'Equal distance': r.ties, 'Manual closer': r.losses, 'Adjusted p': fmt_p(r.p_holm), 'PSAD ≥0.15 to <0.15, n': r.crossed_down, 'PSAD <0.15 to ≥0.15, n': r.crossed_up} for r in psad_summary.itertuples()])
 rows = []
 for r in biopsy_cases.to_dict('records'):
     row = {'Dataset': r['name'], 'Case': r['ID']}
@@ -848,7 +850,7 @@ pd.concat(agreement_members, ignore_index=True).to_csv(OUTPUT_DIR / 'manual_refe
 def outside_display(x, y, xlim, ylim):
     return (np.asarray(x) < xlim[0]) | (np.asarray(x) > xlim[1]) | (np.asarray(y) < ylim[0]) | (np.asarray(y) > ylim[1])
 
-fig, axes = plt.subplots(6, 2, figsize=(8.5, 9.75), sharex=True, sharey='col', constrained_layout=True)
+fig, axes = plt.subplots(6, 2, figsize=(7, 9), sharex=True, sharey='col', constrained_layout=True)
 fig.get_layout_engine().set(w_pad=.04, h_pad=.04, wspace=.04, hspace=.04)
 # Layout-aware headings stay centered over their respective columns.
 for ax, heading in zip(axes[0], ['Absolute difference', 'Relative difference']):

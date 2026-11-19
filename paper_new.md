@@ -1,5 +1,6 @@
 ---
 bibliography: paper_new.bib
+link-citations: true
 ---
 
 # Introduction
@@ -74,16 +75,16 @@ On the external-coil subgroup of the Multicenter Data testing fold, mean whole-g
 
 <!-- TABLE_1_START -->
 
-| Dataset | Multicenter | Single-center | Clinical ellipsoid |
-| --- | --- | --- | --- |
-| Multicenter Data (external coil) (n = 22) | 0.905 | 0.904 | — |
-| Multicenter Data (ERC) (n = 13) | 0.911 | 0.593 | — |
-| ProstateX RUMC (n = 157) | 0.906 | 0.916 | — |
-| Toronto JDMI (n = 383) | — | — | — |
-| PI-CAI RUMC (n = 275) | 0.919 | 0.961 | — |
-| Toronto JDMI Additional (n = 3,718) | 0.939 | 0.934 | — |
-| PI-CAI ZGT (n = 168) | 0.929 | 0.953 | — |
-| PI-CAI PCNN (wide field) (n = 315) | 0.882 | 0.558 | — |
+| Dataset | Multicenter | Single-center |
+| --- | --- | --- |
+| Multicenter Data (external coil) (n = 22) | 0.905 | 0.904 |
+| Multicenter Data (ERC) (n = 13) | 0.911 | 0.593 |
+| ProstateX RUMC (n = 157) | 0.906 | 0.916 |
+| Toronto JDMI (n = 383) | — | — |
+| PI-CAI RUMC (n = 275) | 0.919 | 0.961 |
+| Toronto JDMI Additional (n = 3,718) | 0.939 | 0.934 |
+| PI-CAI ZGT (n = 168) | 0.929 | 0.953 |
+| PI-CAI PCNN (wide field) (n = 315) | 0.882 | 0.558 |
 
 <!-- TABLE_1_END -->
 
@@ -386,7 +387,7 @@ picai_10349_1000355       77.20
 ## Impact on PSAD category and simulated biopsy recommendation
 
 
-PSAD categories calculated using automated volumetry were closer to the reference category in 73/142 Toronto JDMI Additional outliers, equally distant in 62, and farther in seven (Table 5). Across the two manual-reference cohorts, automated PSAD categories were closer in eight of 11 evaluable cases, equally distant in three, and farther in none (unadjusted p = 0.008). One ProstateX disagreement case lacked PSA and was excluded from PSAD comparisons. Across all six cohorts, automated categories were closer in 116 of 231 evaluable cases, equally distant in 94, and farther in 21 (unadjusted p < 0.001).
+PSAD categories calculated using automated volumetry were closer to the reference category in 73/142 Toronto JDMI Additional outliers, equally distant in 62, and farther in seven (Table 5). Across the two manual-reference cohorts, automated PSAD categories were closer in eight of 11 evaluable cases, equally distant in three, and farther in none (p = 0.008). One ProstateX disagreement case lacked PSA and was excluded from PSAD comparisons. Across all six cohorts, automated categories were closer in 116 of 231 evaluable cases, equally distant in 94, and farther in 21 (p < 0.001).
 
 **Table 5. Ordinal PSAD category closeness among common-criteria outliers.** Equal-distance counts are retained because categorical ties are meaningful. Boundary crossings compare manual ellipsoid with automated PSAD using unrounded values: ≥0.15 to <0.15 / <0.15 to ≥0.15 ng/mL², with equality assigned to the higher category. Adjusted p-values test automated versus manual wins among non-ties against 50%, with Holm correction across six cohorts. Undefined tests, if encountered, conservatively occupy a family slot as p = 1 when adjusting the other cohorts and remain undefined in the output.
 
@@ -400,6 +401,7 @@ PSAD categories calculated using automated volumetry were closer to the referenc
 | Toronto JDMI Additional (n = 142) | 73 | 62 | 7 | <0.001 | 31 | 9 |
 | PI-CAI ZGT (n = 7) | 3 | 4 | 0 | 0.500 | 1 | 0 |
 | PI-CAI PCNN (wide field) (n = 60) | 26 | 21 | 13 | 0.213 | 23 | 4 |
+
 <!-- TABLE_5_END -->
 
 Forty-seven out of 232 disagreement cases had PI-RADS 3: none in ProstateX, three in Toronto JDMI, one in PI-CAI RUMC excluding ProstateX RUMC, 30 in Toronto JDMI Additional, one in ZGT, and 12 in PCNN. The individual cases are shown in Table 6. Twenty cases had unknown outcomes, comprising one Toronto JDMI and 19 Toronto Additional cases.
@@ -438,7 +440,9 @@ Unverified table:
 ³ False negative → true positive. ⁴ True positive → false negative.
  -->
 
-Overall, 13 of 47 (27.7%) PI-RADS 3 cases had changed biopsy recommendations between manual ellipsoid and automated volumetry, with nine (69.2%) moving toward the reference recommendation and four (30.8%) moving away. Among the changed cases, six had known negative outcomes and automated volumetry correctly changed to avoiding biopsy in all six; two had known positive outcomes and automated volumetry correctly changed to recommendation in one and incorrectly changed to avoidance in the other. Five other cases had unknown outcomes.
+Overall, 13 of 47 (27.7%) PI-RADS 3 cases had changed biopsy recommendations between manual ellipsoid and automated volumetry, with nine (69.2%) moving toward the reference recommendation and four (30.8%) moving away. Among the changed cases, six had known negative outcomes and automated volumetry correctly changed to avoiding biopsy in all six; two had known positive outcomes and automated volumetry correctly changed to recommendation in one and incorrectly changed to avoidance in the other. (Five other cases had unknown outcomes.) This results in specificity increased from 37.5% (9/24) with manual ellipsoid measurements to 62.5% (15/24; p = 0.03) with automated volumetry, while sensitivity remained 66.7% (2/3) for both methods.
+
+# Appendix A: Table of PI-RADS 3 common-criteria outlier and outcomes
 
 **Table 6. Every PI-RADS 3 common-criteria outlier, including unknown outcomes.** Method cells give volume in mL; PSAD in ng/mL²; and the simulated biopsy recommendation. Displayed PSAD is rounded to three decimals; decisions use unrounded values. Reference is Bosma22b for PI-CAI, median manual-reader planimetry for Toronto JDMI, and nnUNet702 for Toronto JDMI Additional. Rows are sorted globally by outcome (ISUP ≥2, CSCANCER Y, ISUP 0–1, CSCANCER N, then Unknown), then reference, manual, and automated biopsy recommendation (Recommend before Avoid, missing last), then the stated cohort order and case identifier. Identifiers are retained for local audit.
 
@@ -495,13 +499,3 @@ Overall, 13 of 47 (27.7%) PI-RADS 3 cases had changed biopsy recommendations bet
 | Toronto JDMI Additional | AIPR_20011745_20210331_333abfe653d99da | 103.05; 0.104; Avoid | 71.50; 0.150; Avoid | 98.02; 0.109; Avoid | Unknown |
 
 <!-- TABLE_6_END -->
-
-### Interpretation and cohort provenance
-
-Common screening identified a higher review burden in wide-field PCNN than in the other cohorts. Automated volumes were more often closer to the reference in all six selected groups, but sometimes worsened individual volume errors or PSAD classification. The strongest statistical evidence arose in cohorts with automated surrogate references. Small manual-reference groups, data-derived calibration, and selection on disagreement make the findings exploratory. The analysis evaluates a fixed review criterion rather than a proven clinical tolerance or deployed correction workflow. ProstateX threshold calibration is in-sample, and a separate prospective cohort would be needed to evaluate transportability independently.
-
-The six clinical analysis cohorts are disjoint at the patient level. PI-CAI RUMC excluding ProstateX RUMC retains 275 of 391 parent-cohort patients after removing the 116 patients represented in ProstateX RUMC, matched by patient_id. Toronto JDMI Additional comprises the 3,718 eligible patients without a positive finite manual-reference volume, separate from the 383 Toronto JDMI manual-reference patients, with disjointness checked by amrn. Patient identifiers were compared within their respective Dutch and Toronto identifier systems. Cohort membership and removals are exported for audit. Disjointness removes duplicate patients; differing populations and reference methods still require consideration before combining estimates. PSAD category agreement concerns reference-derived categories, not cancer detection. Missing outcomes and the small number of outcome-positive cases in these selected PI-RADS 3 outliers constrain biopsy interpretation.
-
-**Toronto cohort version:** The current consolidated exclude.json is the sole accession exclusion source. Of its 19 entries, 15 match the 4,116-examination clinical listing and four are unmatched. Applying the matched exclusions leaves 4,101 eligible patients: 383 with positive finite manual-reference volumes and 3,718 in Toronto JDMI Additional. All listed reasons are applied without endpoint-specific exceptions. Source cohort flow, exclusion matches and reasons, clinical linkage, measurements, and patient membership are exported under results/paper_new_results/.
-
-**Reproducibility:** Run [the self-contained analysis notebook](notebooks/paper_new_results.py) in cell order using the project environment and enter the source workbook password when prompted if it is encrypted. It reads source clinical data and reviewed manifests, measures saved reference and prediction masks, checks membership and provenance, and generates Tables 1–6 and Figures 1–3 without requiring older analysis exports. Numeric tables, cohort flow, exclusion and clinical-linkage audits, sorted disagreement cases, mask measurements, and input SHA-256 hashes are saved in [results/paper_new_results](results/paper_new_results/). Table markers permit regeneration without replacing this prose. No new training, inference, resampling, or mask modification is performed.
